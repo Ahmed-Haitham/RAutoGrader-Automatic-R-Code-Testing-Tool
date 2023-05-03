@@ -114,172 +114,213 @@ shinyApp(ui, server)
 con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
 
 # Define the R6 classes for each table
-# users - without user_id because is auto-incremented
+# users - ok SQL working
 users <- R6Class("users",
                  public = list(
+                   user_id = NULL,
                    username = NULL,
                    
                    initialize = function(username) {
-                     
                      self$username <- username
+                     
+                     # retrieve the last user_id from the users table
+                     result <- dbGetQuery(con, "SELECT user_id FROM users ORDER BY user_id DESC LIMIT 1")
+                     
+                     if (nrow(result) == 0) {
+                       # if there are no existing users, then user_id = 1
+                       self$user_id <- 1
+                     } else {
+                       # set the user_id to the last user_id plus one
+                       self$user_id <- result + 1
+                     }
                      
                      invisible(self)
                    },
                    
                    insert = function() {
-                     dbExecute(con, "INSERT INTO users (username) VALUES (?)", self$username)
+                     query <- paste0("INSERT INTO users (user_id, username) VALUES (", 
+                                     self$user_id, ", '", self$username, "')")
+                     dbExecute(con, query)
                    }
                  )
 )
 
-# courses - without course id as it is auto-incremented
+# courses - Ok SQL working
 courses <- R6Class("courses",
                    public = list(
-                     
+                     course_id = NULL,
                      course_name = NULL,
+                     group_name = NULL,
+                     group_hour = NULL,  # format xx:xx-xx:xx length 11 max
+                     day_week = NULL, # format mon, tue, wed, thu, fri, sat length 3 max
                      
-                     initialize = function(course_name) {
-                       
+                     initialize = function(course_name, group_name, group_hour, day_week) {
                        self$course_name <- course_name
+                       self$group_name <- group_name
+                       self$group_hour <- group_hour
+                       self$day_week <- day_week
+                       
+                       courseid <- dbGetQuery(con, "SELECT course_id FROM courses ORDER BY course_id DESC LIMIT 1")
+                       if (nrow(courseid) == 0) {
+                         self$course_id <- 1
+                       } else {
+                         self$course_id <- courseid + 1
+                       }
+                       
                        
                        invisible(self)
                      },
                      
                      insert = function() {
-                       dbExecute(con, "INSERT INTO courses (course_name) VALUES (?)", self$course_name)
+                       query <- paste0("INSERT INTO courses (course_id, course_name, 
+                                       group_name, group_hour, day_week) VALUES (", 
+                                       self$course_id, ", '", self$course_name, "', '", 
+                                       self$group_name, "', '", self$group_hour, "', '", 
+                                       self$day_week, "')")
+                       
+                       dbExecute(con, query)
                      }
                    )
 )
 
-# groups - without group_id? how to retrieve?
-groups <- R6Class("groups",
+# create variable scale, extract day from day_week? group schedule + 2 days = 100, + 3 days = 80?
+# --- pending code here ---
+
+# tests - Ok SQL working
+tests <- R6Class("tests",
                   public = list(
-                    group_id = NULL,
-                    course_id = NULL,
-                    group_name = NULL,
-                    time = NULL,
-                    days_week = NULL,
+                    test_id = NULL,
+                    test_topic = NULL,
                     
-                    initialize = function(group_id, course_id, group_name, time, days_week) {
-                      self$group_id <- group_id
-                      self$course_id <- course_id
-                      self$group_name <- group_name
-                      self$time <- time
-                      self$days_week <- days_week
+                    initialize = function(test_topic) {
+                      self$test_topic <- test_topic
+                      testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
+                      if (nrow(testid) == 0) {
+                        self$test_id <- 1
+                      } else {
+                        self$test_id <- testid + 1
+                      }
                       
                       invisible(self)
                     },
                     
                     insert = function() {
-                      dbExecute(con, "INSERT INTO groups (group_id, course_id, group_name, time, days_week) VALUES (?, ?, ?, ?, ?)",
-                                self$group_id, self$course_id, self$group_name, self$time, self$days_week)
+                      query <- paste0("INSERT INTO tests (test_id, test_topic) VALUES (", 
+                                      self$test_id, ", '", self$test_topic, "')")
+                      dbExecute(con, query)
                     }
                   )
 )
 
-# tasks - without group_id? how to retrieve?
-tasks <- R6Class("tasks",
-                 public = list(
-                   task_id = NULL,
-                   group_id = NULL,
-                   task_number = NULL,
-                   grading_scale = NULL,
-                   submission_date = NULL,
-                   task_mean_grade = NULL,
-                   
-                   initialize = function(task_id, group_id, task_number, grading_scale, submission_date, task_mean_grade) {
-                     self$task_id <- task_id
-                     self$group_id <- group_id
-                     self$task_number <- task_number
-                     self$grading_scale <- grading_scale
-                     self$submission_date <- submission_date
-                     self$task_mean_grade <- task_mean_grade
-                     
-                     invisible(self)
-                   },
-                   
-                   insert = function() {
-                     dbExecute(con, "INSERT INTO tasks (task_id, group_id, task_number, grading_scale, submission_date, task_mean_grade)
-                     VALUES (?, ?, ?, ?, ?, ?)", self$task_id, self$group_id, self$task_number, self$grading_scale,
-                               self$submission_date, self$task_mean_grade)
-                   }
-                 )
-)
+# tests deadlines, scale on 100 points or 80 points
+# -- variables here --
 
-# teaching - without group_id? how to retrieve?
-teaching <- R6Class("teaching",
-                    public = list(
-                      teach_id = NULL,
-                      user_id = NULL,
-                      course_id = NULL,
-                      group_id = NULL,
-                      
-                      initialize = function(teach_id, user_id, course_id, group_id) {
-                        self$teach_id <- teach_id
-                        self$user_id <- user_id
-                        self$course_id <- course_id
-                        self$group_id <- group_id
-                        
-                        invisible(self)
-                      },
-                      
-                      insert = function() {
-                        dbExecute(con, "INSERT INTO teaching (teach_id, user_id, course_id, group_id) VALUES (?, ?, ?, ?)",
-                                  self$teach_id, self$user_id, self$course_id, self$group_id)
-                      }
-                    )
-)
-                                  
-# questions - without group_id? how to retrieve?
+# questions - Ok SQL connection working
 questions <- R6Class("questions",
                      public = list(
                        question_id = NULL,
-                       task_id = NULL,
-                       question_name = NULL,
+                       test_id = NULL,
+                       question_number = NULL,
+                       question_description = NULL,
                        question_answer = NULL,
+                       answers_filepath = "None",
                        
-                       initialize = function(question_id, task_id, question_name, question_answer) {
-                         self$question_id <- question_id
-                         self$task_id <- task_id
-                         self$question_name <- question_name
+                       initialize = function(question_number, question_description,
+                                             question_answer, answers_filepath = "None") {
+                         
+                         self$question_number <- question_number
+                         self$question_description <- question_description
                          self$question_answer <- question_answer
+                         self$answers_filepath <- answers_filepath
+                         
+                         questid <- dbGetQuery(con, "SELECT question_id FROM questions ORDER BY question_id DESC LIMIT 1")
+                         if (nrow(questid) == 0) {
+                           self$question_id <- 1
+                         } else {
+                           self$question_id <- questid + 1
+                         }
+                         
+                         result <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
+                         if (nrow(result) == 0) {
+                           self$test_id <- 1
+                         } else {
+                           self$test_id <- result
+                         }
+                         
                          
                          invisible(self)
                        },
                        
                        insert = function() {
-                         dbExecute(con, "INSERT INTO questions (question_id, task_id, question_name, question_answer) VALUES (?, ?, ?, ?)",
-                                   self$question_id, self$task_id, self$question_name, self$question_answer)
+                         query <- paste0("INSERT INTO questions (question_id, test_id, question_number, 
+                                       question_description, question_answer, answers_filepath) VALUES (", 
+                                         self$question_id, ", ", self$test_id, ", '", self$question_number, "', '",
+                                         self$question_description, "', '", self$question_answer, "', '", 
+                                         self$answers_filepath, "')")
+                         
+                         dbExecute(con, query)
                        }
                      )
 )
 
-# TEST R6 CLASSES - not tested yet 
-maria <- users$new("Maria Kubara")
+# teaching - in progress
+teaching <- R6Class("teaching",
+                    public = list(
+                      
+                      user_id = NULL,
+                      course_id = NULL,
+                      test_id = NULL,
+                      question_id = NULL,
+                      
+                      initialize = function(user_id, course_id, test_id, question_id) {
+                        #course_id_query <- sprintf("SELECT course_id FROM courses WHERE course_name='%s'", course_name)
+                        #course_id <- dbGetQuery(con, course_id_query)$course_id[1]
+                        
+                        self$user_id <- user_id
+                        self$course_id <- course_id
+                        self$test_id <- test_id
+                        self$question_id <- question_id
+                        
+                        invisible(self)
+                      },
+                      
+                      insert = function() {
+                        dbExecute(con, "INSERT INTO teaching (teach_id, user_id, course_id, 
+                                  test_id, question_id) VALUES (?, ?, ?, ?, ?)",
+                                  self$user_id, self$course_id, self$test_id, self$question_id)
+                      }
+                    )
+)
+                                  
 
-# Create the courses
-r_intro <- courses$new("R intro")
-webscraping <- courses$new("Webscraping")
-econometrics <- courses$new("Econometrics")
+# TEST R6 CLASSES - not tested yet 
+# tested - ok
+maria <- users$new("Maria Kubara")
+maria$insert()
+dbGetQuery(con, "SELECT * FROM users")
 
 # Create the groups
-r_intro_gr1 <- groups$new("gr 1", "9-10.45", c("Mon", "Thu"))
-r_intro_gr2 <- groups$new("gr 2", "11-12.30", c("Mon", "Thu"))
-r_intro_gr3 <- groups$new("gr 3", "16.45-18.15", c("Wed", "Fri"))
-webscraping_gr1 <- groups$new("gr 1", "11-12.30", c("Mon", "Thu"))
-webscraping_gr2 <- groups$new("gr 2", "16.45-18.15", c("Wed", "Fri"))
-econometrics_gr1 <- groups$new("gr 1", "9-10.45", c("Mon", "Thu"))
+# tested - ok 
+r_intro_gr1 <- courses$new("R intro", "gr 1", "9-10.45", "Mon")
+r_intro_gr1$insert()
+dbGetQuery(con, "SELECT * FROM courses")
+
+# create tests
+# tested - ok
+loops <- tests$new("Data types")
+loops$insert()
+dbGetQuery(con, "SELECT * FROM tests")
+
+# Create questions
+# tested - ok
+q1 <- questions$new(1, "choose the correct answer:", "vector")
+q1$insert()
+dbGetQuery(con, "SELECT * FROM questions")
 
 # Create the teaching relationship - table
-maria_teaching_r_intro_gr1 <- teaching$new(teach_id = 1, user_id = maria$user_id, course_id = r_intro$course_id, group_id = r_intro_gr1$group_id)
-maria_teaching_r_intro_gr3 <- teaching$new(teach_id = 2, user_id = maria$user_id, course_id = r_intro$course_id, group_id = r_intro_gr3$group_id)
-maria_teaching_econometrics_gr1 <- teaching$new(teach_id = 3, user_id = maria$user_id, course_id = econometrics$course_id, group_id = econometrics_gr1$group_id)
-
-# Check if the data was inserted correctly into the database???
-dbGetQuery(con, "SELECT * FROM users")
-dbGetQuery(con, "SELECT * FROM courses")
-dbGetQuery(con, "SELECT * FROM groups")
-dbGetQuery(con, "SELECT * FROM tasks")
+# testing 
+maria_teaching_r_intro_gr1 <- teaching$new()
+maria_teaching_r_intro_gr1$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
-dbGetQuery(con, "SELECT * FROM questions")
+
 
