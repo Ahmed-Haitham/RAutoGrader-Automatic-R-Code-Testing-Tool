@@ -292,7 +292,6 @@ teaching <- R6Class("teaching",
                     )
 )
 
-
 # TEST R6 CLASSES - not tested yet 
 # tested - ok
 maria <- users$new("Maria Kubara")
