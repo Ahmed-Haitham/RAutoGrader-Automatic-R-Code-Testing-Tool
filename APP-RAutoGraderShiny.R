@@ -188,28 +188,28 @@ courses <- R6Class("courses",
 
 # tests - Ok SQL working
 tests <- R6Class("tests",
-                  public = list(
-                    test_id = NULL,
-                    test_topic = NULL,
-                    
-                    initialize = function(test_topic) {
-                      self$test_topic <- test_topic
-                      testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
-                      if (nrow(testid) == 0) {
-                        self$test_id <- 1
-                      } else {
-                        self$test_id <- testid + 1
-                      }
-                      
-                      invisible(self)
-                    },
-                    
-                    insert = function() {
-                      query <- paste0("INSERT INTO tests (test_id, test_topic) VALUES (", 
-                                      self$test_id, ", '", self$test_topic, "')")
-                      dbExecute(con, query)
-                    }
-                  )
+                 public = list(
+                   test_id = NULL,
+                   test_topic = NULL,
+                   
+                   initialize = function(test_topic) {
+                     self$test_topic <- test_topic
+                     testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
+                     if (nrow(testid) == 0) {
+                       self$test_id <- 1
+                     } else {
+                       self$test_id <- testid + 1
+                     }
+                     
+                     invisible(self)
+                   },
+                   
+                   insert = function() {
+                     query <- paste0("INSERT INTO tests (test_id, test_topic) VALUES (", 
+                                     self$test_id, ", '", self$test_topic, "')")
+                     dbExecute(con, query)
+                   }
+                 )
 )
 
 # tests deadlines, scale on 100 points or 80 points
@@ -291,7 +291,6 @@ teaching <- R6Class("teaching",
                       }
                     )
 )
-                                  
 
 # TEST R6 CLASSES - not tested yet 
 # tested - ok
@@ -322,5 +321,3 @@ dbGetQuery(con, "SELECT * FROM questions")
 maria_teaching_r_intro_gr1 <- teaching$new()
 maria_teaching_r_intro_gr1$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
-
-
