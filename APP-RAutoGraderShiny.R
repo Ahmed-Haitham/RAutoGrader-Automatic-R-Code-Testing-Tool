@@ -263,18 +263,22 @@ questions <- R6Class("questions",
                      )
 )
 
-# teaching - in progress
+# teaching - ok, SQL connection working
 teaching <- R6Class("teaching",
                     public = list(
-                      
+                      teach_id = NULL,
                       user_id = NULL,
                       course_id = NULL,
                       test_id = NULL,
                       question_id = NULL,
                       
                       initialize = function(user_id, course_id, test_id, question_id) {
-                        #course_id_query <- sprintf("SELECT course_id FROM courses WHERE course_name='%s'", course_name)
-                        #course_id <- dbGetQuery(con, course_id_query)$course_id[1]
+                        teach <- dbGetQuery(con, "SELECT teach_id FROM teaching ORDER BY teach_id DESC LIMIT 1")
+                        if (nrow(teach) == 0) {
+                          self$teach_id <- 1
+                        } else {
+                          self$teach_id <- teach + 1
+                        }
                         
                         self$user_id <- user_id
                         self$course_id <- course_id
@@ -285,9 +289,12 @@ teaching <- R6Class("teaching",
                       },
                       
                       insert = function() {
-                        dbExecute(con, "INSERT INTO teaching (teach_id, user_id, course_id, 
-                                  test_id, question_id) VALUES (?, ?, ?, ?, ?)",
-                                  self$user_id, self$course_id, self$test_id, self$question_id)
+                        query <- paste0("INSERT INTO teaching (teach_id, user_id, course_id, 
+                                       test_id, question_id) VALUES (", 
+                                        self$teach_id, ", ", self$user_id, ", '", self$course_id, "', '",
+                                        self$test_id, "', '", self$question_id, "')")
+                        
+                        dbExecute(con, query)
                       }
                     )
 )
@@ -317,7 +324,7 @@ q1$insert()
 dbGetQuery(con, "SELECT * FROM questions")
 
 # Create the teaching relationship - table
-# testing 
-maria_teaching_r_intro_gr1 <- teaching$new()
+# tested - ok 
+maria_teaching_r_intro_gr1 <- teaching$new(4,1,1,1)
 maria_teaching_r_intro_gr1$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
