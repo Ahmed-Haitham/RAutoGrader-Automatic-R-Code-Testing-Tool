@@ -28,6 +28,10 @@ if (interactive()) {
     ui <- fluidPage(
       useShinyjs(),
       h1(id='h1', "Welcome to the Automatic R grader management tool!"),
+      div( id = 'sidebarpanel', sidebarPanel(
+        h2(id = "welcome-msg", "Welcome,")
+        
+      )),
       
       # Dropdown to select the username
       selectInput(inputId = "username",
@@ -57,11 +61,7 @@ if (interactive()) {
                     tabPanel(title = "Tab 3", "This is the content of Tab 3")
                     
         )
-      ),
-      sidebarPanel(
-        h4("This is the sidebar panel"),
-        p("You can add any content here that you want to be visible for all tabs.")
-      ),
+      )
     ),
     
     # Define the server
@@ -95,6 +95,18 @@ if (interactive()) {
         }
       })
       
+#      # Update the welcome message when a user is selected
+      observeEvent(input$username, {
+        # Get the selected username
+        username <- input$username
+        
+        # Set the welcome message
+        updateTabsetPanel(session, "tabset",
+                          sidebarPanel(
+                            h2(paste0("Welcome, ", username))
+                          ))
+      })
+      
       # When the continue button is clicked, show the tabset
       observeEvent(input$continueBtn, {
         hide("h1")
@@ -102,6 +114,7 @@ if (interactive()) {
         hide("register-link")
         hide("username")
         hide("continueBtn")
+        show("sidebarpanel")
         show("tabset")
       })
     }
