@@ -57,7 +57,11 @@ if (interactive()) {
                     tabPanel(title = "Tab 3", "This is the content of Tab 3")
                     
         )
-      )
+      ),
+      sidebarPanel(
+        h4("This is the sidebar panel"),
+        p("You can add any content here that you want to be visible for all tabs.")
+      ),
     ),
     
     # Define the server
@@ -66,7 +70,7 @@ if (interactive()) {
       # Connect to the SQLite database
       con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
       
-      # Define a reactive expression to get the user_id for the selected username
+      # Reactive expression to get the user_id from the selected username
       user_id <- reactive({
         if (input$username == "-- Please select your username") {
           1
@@ -183,9 +187,6 @@ courses <- R6Class("courses",
                    )
 )
 
-# create variable scale, extract day from day_week? group schedule + 2 days = 100, + 3 days = 80?
-# --- pending code here ---
-
 # tests - Ok SQL working
 tests <- R6Class("tests",
                  public = list(
@@ -212,8 +213,10 @@ tests <- R6Class("tests",
                  )
 )
 
-# tests deadlines, scale on 100 points or 80 points
-# -- variables here --
+# grading submission within 3 days = 100, within 10 days = 80, else 0
+# user should input date of the quiz
+# --- pending code here ---
+
 
 # questions - Ok SQL connection working
 questions <- R6Class("questions",
@@ -299,7 +302,7 @@ teaching <- R6Class("teaching",
                     )
 )
 
-# TEST R6 CLASSES - not tested yet 
+# TEST R6 CLASSES - all ok
 # tested - ok
 maria <- users$new("Maria Kubara")
 maria$insert()
