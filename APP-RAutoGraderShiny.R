@@ -16,22 +16,21 @@ if (length(missing_packages) > 0) {
 
 #renv::restore()
 
+# Connect to the SQLite database
+con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
 
 # Shiny App
 if (interactive()) {
   library("shiny")
   library("shinyjs")
   library("RSQLite")
+  con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
   
   shinyApp(
-    # Define the UI
+    
     ui <- fluidPage(
       useShinyjs(),
       h1(id='h1', "Welcome to the Automatic R grader management tool!"),
-      div( id = 'sidebarpanel', sidebarPanel(
-        h2(id = "welcome-msg", "Welcome,")
-        
-      )),
       
       # Dropdown to select the username
       selectInput(inputId = "username",
@@ -50,30 +49,16 @@ if (interactive()) {
          <a href='#' id='register-link'>Register here</a></p>")),
       
       # Tabset with 3 tabs, will show after clicking 'Continue'
-      conditionalPanel(
-        condition = "input.continueBtn > 0",
-        tabsetPanel(id = "tabset",
-                    # Tab 1
-                    tabPanel(title = "Tab 1", "This is the content of Tab 1"),
-                    # Tab 2
-                    tabPanel(title = "Tab 2", "This is the content of Tab 2"),
-                    # Tab 3
-                    tabPanel(title = "Tab 3", "This is the content of Tab 3")
-                    
-        )
-      )
+      uiOutput("tabset_ui")
     ),
     
     # Define the server
     server <- function(input, output, session) {
       
-      # Connect to the SQLite database
-      con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
-      
       # Reactive expression to get the user_id from the selected username
       user_id <- reactive({
         if (input$username == "-- Please select your username") {
-          1
+          0
         } else {
           dbGetQuery(con, paste0("SELECT user_id FROM users WHERE username = '", input$username, "'"))$user_id
         }
@@ -93,18 +78,7 @@ if (interactive()) {
         } else {
           shinyjs::disable("continueBtn")
         }
-      })
-      
-#      # Update the welcome message when a user is selected
-      observeEvent(input$username, {
-        # Get the selected username
-        username <- input$username
-        
-        # Set the welcome message
-        updateTabsetPanel(session, "tabset",
-                          sidebarPanel(
-                            h2(paste0("Welcome, ", username))
-                          ))
+        print(input$username)
       })
       
       # When the continue button is clicked, show the tabset
@@ -114,17 +88,77 @@ if (interactive()) {
         hide("register-link")
         hide("username")
         hide("continueBtn")
-        show("sidebarpanel")
-        show("tabset")
+        output$tabset_ui <- renderUI({
+          div(
+            id = 'sidebarpanel', 
+            sidebarPanel(
+              h3(id = "welcome-msg", "Welcome, ", input$username),
+              selectInput(inputId = "courses",
+                          label = "Select one of your courses:",
+                          choices = dbGetQuery(con, paste0("
+                        SELECT DISTINCT course_name FROM courses JOIN 
+                        teaching ON teaching.course_id = courses.course_id
+                        JOIN users ON users.user_id = teaching.user_id
+                        WHERE users.username = '", input$username, "'"))$course_name,
+                          selected = "-- Select an option"),
+              checkboxGroupInput(inputId = 'groups',
+                                 label = 'Select the group(s) for analysis:',
+                                 choices = NULL),
+              selectInput(inputId = "tests",
+                          label = "Select the test:",
+                          choices = #MISSING QUERY 
+                          )
+            ),
+            
+              
+              
+            
+            
+            tabsetPanel(
+              id = "tabset",
+              # Tab 1
+              tabPanel(title = "Tab 1", "This is the content of Tab 1"),
+              # Tab 2
+              tabPanel(title = "Tab 2", "This is the content of Tab 2"),
+              # Tab 3
+              tabPanel(title = "Tab 3", "This is the content of Tab 3")
+            )
+          )
+        })
       })
+      
+      # Update the checkbox options whenever the courses selection changes
+      observeEvent(input$courses, {
+        # Get the user_id for the selected username
+        user_id_val <- user_id()
+        
+        # Get the group names for the selected course
+        group_names <- dbGetQuery(con, paste0("
+                          SELECT DISTINCT courses.group_name 
+                          FROM courses 
+                          JOIN teaching ON courses.course_id = teaching.course_id 
+                          WHERE teaching.user_id = '", user_id_val, "' AND teaching.course_id IN (
+                              SELECT DISTINCT courses.course_id 
+                              FROM courses 
+                              JOIN teaching ON courses.course_id = teaching.course_id 
+                              WHERE teaching.user_id = '", user_id_val, "' AND courses.course_name = '", input$courses, "'
+                          )
+                      "))$group_name
+        
+        # Update the checkbox options - WHEN CHECKED DISAPPEARS
+        updateCheckboxGroupInput(session, "groups", choices = group_names)
+      })
+      
     }
   )
 }
-
 # Run the app
 shinyApp(ui, server)
 
-
+#--------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------
 # R6 classes
 
 # Define the database connection
