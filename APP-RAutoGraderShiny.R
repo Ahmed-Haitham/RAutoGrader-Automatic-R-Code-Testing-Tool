@@ -106,7 +106,7 @@ if (interactive()) {
                                  choices = NULL),
               selectInput(inputId = "tests",
                           label = "Select the test:",
-                          choices = #MISSING QUERY 
+                          choices = c('missing query HERE')
                           )
             ),
             
@@ -159,8 +159,8 @@ shinyApp(ui, server)
 #--------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------
-# R6 classes
 
+# R6 classes
 # Define the database connection
 con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
 
@@ -196,42 +196,56 @@ users <- R6Class("users",
                  )
 )
 
-# courses - Ok SQL working
-courses <- R6Class("courses",
-                   public = list(
-                     course_id = NULL,
-                     course_name = NULL,
-                     group_name = NULL,
-                     group_hour = NULL,  # format xx:xx-xx:xx length 11 max
-                     day_week = NULL, # format mon, tue, wed, thu, fri, sat length 3 max
-                     
-                     initialize = function(course_name, group_name, group_hour, day_week) {
-                       self$course_name <- course_name
-                       self$group_name <- group_name
-                       self$group_hour <- group_hour
-                       self$day_week <- day_week
-                       
-                       courseid <- dbGetQuery(con, "SELECT course_id FROM courses ORDER BY course_id DESC LIMIT 1")
-                       if (nrow(courseid) == 0) {
-                         self$course_id <- 1
-                       } else {
-                         self$course_id <- courseid + 1
-                       }
-                       
-                       
-                       invisible(self)
-                     },
-                     
-                     insert = function() {
-                       query <- paste0("INSERT INTO courses (course_id, course_name, 
-                                       group_name, group_hour, day_week) VALUES (", 
-                                       self$course_id, ", '", self$course_name, "', '", 
-                                       self$group_name, "', '", self$group_hour, "', '", 
-                                       self$day_week, "')")
-                       
-                       dbExecute(con, query)
+# groups - Ok SQL working
+groups <- R6Class("groups",
+                 public = list(
+                   group_id = NULL,
+                   group_name = NULL,
+                   
+                   initialize = function(group_name) {
+                     self$group_name <- group_name
+                     groupid <- dbGetQuery(con, "SELECT group_id FROM groups ORDER BY group_id DESC LIMIT 1")
+                     if (nrow(groupid) == 0) {
+                       self$group_id <- 1
+                     } else {
+                       self$group_id <- groupid + 1
                      }
-                   )
+                     
+                     invisible(self)
+                   },
+                   
+                   insert = function() {
+                     query <- paste0("INSERT INTO groups (group_id, group_name) VALUES (", 
+                                     self$group_id, ", '", self$group_name, "')")
+                     dbExecute(con, query)
+                   }
+                 )
+)
+
+# days_of_week - Ok SQL working
+days_of_week <- R6Class("days_of_weeks",
+                  public = list(
+                    id_days = NULL,
+                    days = NULL,
+                    
+                    initialize = function(days) {
+                      self$days <- days
+                      dayid <- dbGetQuery(con, "SELECT id_days FROM days_of_week ORDER BY id_days DESC LIMIT 1")
+                      if (nrow(dayid) == 0) {
+                        self$id_days <- 1
+                      } else {
+                        self$id_days <- dayid + 1
+                      }
+                      
+                      invisible(self)
+                    },
+                    
+                    insert = function() {
+                      query <- paste0("INSERT INTO days_of_week (id_days, days) VALUES (", 
+                                      self$id_days, ", '", self$days, "')")
+                      dbExecute(con, query)
+                    }
+                  )
 )
 
 # tests - Ok SQL working
@@ -260,10 +274,107 @@ tests <- R6Class("tests",
                  )
 )
 
-# grading submission within 3 days = 100, within 10 days = 80, else 0
-# user should input date of the quiz
-# --- pending code here ---
+# teaching - ok, SQL connection working
+teaching <- R6Class("teaching",
+                    public = list(
+                      teach_id = NULL,
+                      user_id = NULL,
+                      course_id = NULL,
+                      test_id = NULL,
+                      question_id = NULL,
+                      group_id = NULL,
+                      id_days = NULL,
+                      schedule_id = NULL,
+                      
+                      initialize = function(user_id, course_id, test_id, question_id, group_id, id_days, 
+                                            schedule_id) {
+                        teach <- dbGetQuery(con, "SELECT teach_id FROM teaching ORDER BY teach_id DESC LIMIT 1")
+                        if (nrow(teach) == 0) {
+                          self$teach_id <- 1
+                        } else {
+                          self$teach_id <- teach + 1
+                        }
+                        
+                        self$user_id <- user_id
+                        self$course_id <- course_id
+                        self$test_id <- test_id
+                        self$question_id <- question_id
+                        self$group_id <- group_id
+                        self$id_days <- id_days
+                        self$schedule_id <- schedule_id
+                        
+                        invisible(self)
+                      },
+                      
+                      insert = function() {
+                        query <- paste0("INSERT INTO teaching (teach_id, user_id, course_id, 
+                                       test_id, question_id, group_id, id_days, schedule_id) VALUES (", 
+                                        self$teach_id, ", ", self$user_id, ", '", self$course_id, "', '",
+                                        self$test_id, "', '", self$question_id, "', '", self$group_id, "', '",
+                                        self$id_days, "', '", self$schedule_id, "')")
+                        
+                        dbExecute(con, query)
+                      }
+                    )
+)
 
+# courses - Ok SQL working
+courses <- R6Class("courses",
+                   public = list(
+                     course_id = NULL,
+                     course_name = NULL,
+                     initialize = function(course_name) {
+                       self$course_name <- course_name
+                       
+                       courseid <- dbGetQuery(con, "SELECT course_id FROM courses ORDER BY course_id DESC LIMIT 1")
+                       if (nrow(courseid) == 0) {
+                         self$course_id <- 1
+                       } else {
+                         self$course_id <- courseid + 1
+                       }
+                       
+                       
+                       invisible(self)
+                     },
+                     
+                     insert = function() {
+                       query <- paste0("INSERT INTO courses (course_id, course_name) VALUES (", 
+                                       self$course_id, ", '", self$course_name, "')")
+                       
+                       dbExecute(con, query)
+                     }
+                   )
+)
+# schedules - Ok SQL working
+schedules <- R6Class("schedules",
+                   public = list(
+                     schedule_id = NULL,
+                     start_time = NULL,
+                     end_time = NULL,
+                     initialize = function(start_time, end_time) {
+                       
+                       scheduleid <- dbGetQuery(con, "SELECT schedule_id FROM schedules ORDER BY schedule_id DESC LIMIT 1")
+                       if (nrow(scheduleid) == 0) {
+                         self$schedule_id <- 1
+                       } else {
+                         self$schedule_id <- scheduleid + 1
+                       }
+                       
+                       self$start_time <- start_time
+                       self$end_time <- end_time
+                       
+                       
+                       invisible(self)
+                     },
+                     
+                     insert = function() {
+                       query <- paste0("INSERT INTO courses (course_id, course_name) VALUES (", 
+                                       self$course_id, ", '", self$course_name, "')")
+                       
+                       dbExecute(con, query)
+                     }
+                   )
+)
 
 # questions - Ok SQL connection working
 questions <- R6Class("questions",
@@ -313,41 +424,6 @@ questions <- R6Class("questions",
                      )
 )
 
-# teaching - ok, SQL connection working
-teaching <- R6Class("teaching",
-                    public = list(
-                      teach_id = NULL,
-                      user_id = NULL,
-                      course_id = NULL,
-                      test_id = NULL,
-                      question_id = NULL,
-                      
-                      initialize = function(user_id, course_id, test_id, question_id) {
-                        teach <- dbGetQuery(con, "SELECT teach_id FROM teaching ORDER BY teach_id DESC LIMIT 1")
-                        if (nrow(teach) == 0) {
-                          self$teach_id <- 1
-                        } else {
-                          self$teach_id <- teach + 1
-                        }
-                        
-                        self$user_id <- user_id
-                        self$course_id <- course_id
-                        self$test_id <- test_id
-                        self$question_id <- question_id
-                        
-                        invisible(self)
-                      },
-                      
-                      insert = function() {
-                        query <- paste0("INSERT INTO teaching (teach_id, user_id, course_id, 
-                                       test_id, question_id) VALUES (", 
-                                        self$teach_id, ", ", self$user_id, ", '", self$course_id, "', '",
-                                        self$test_id, "', '", self$question_id, "')")
-                        
-                        dbExecute(con, query)
-                      }
-                    )
-)
 
 # TEST R6 CLASSES - all ok
 # tested - ok
