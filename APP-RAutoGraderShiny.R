@@ -19,185 +19,8 @@ lapply(required_packages, library, character.only = TRUE)
 # Connect to the SQLite database
 con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
 
-# Shiny App
-if (interactive()) {
-  library("shiny")
-  library("shinyjs")
-  library("RSQLite")
-  con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
-  
-  shinyApp(
-    
-    ui <- fluidPage(
-      useShinyjs(),
-      h1(id='h1', "Welcome to the Automatic R grader management tool!"),
-      
-      # Dropdown to select the username
-      selectInput(inputId = "username",
-                  label = "Select your username:",
-                  choices = c(dbGetQuery(con, "SELECT DISTINCT username FROM users")$username),
-                  selected = "-- Please select your username"),
-      
-      # Button to continue
-      actionButton(inputId = "continueBtn",
-                   label = "Continue",
-                   disabled = TRUE
-      ),
-      
-      # Hyperlink to register
-      p(HTML("<p id='text-register'>Are you new? 
-         <a href='#' id='register-link'>Register here</a></p>")),
-      
-      # Tabset with 3 tabs, will show after clicking 'Continue'
-      uiOutput("tabset_ui")
-    ),
-    
-    # Define the server
-    server <- function(input, output, session) {
-      
-      # Reactive expression to get the user_id from the selected username
-      user_id <- reactive({
-        if (input$username == "-- Please select your username") {
-          0
-        } else {
-          dbGetQuery(con, paste0("SELECT user_id FROM users WHERE username = '", input$username, "'"))$user_id
-        }
-      })
-      
-      # Enable continue button if username is selected
-      observeEvent(input$username, {
-        # Get the user_id for the selected username
-        user_id_val <- user_id()
-        
-        # Debugging statement
-        print(user_id_val)
-        
-        # Enable the continue button only if the user_id is not 0
-        if (user_id_val != 0) {
-          shinyjs::enable("continueBtn")
-        } else {
-          shinyjs::disable("continueBtn")
-        }
-        print(input$username)
-      })
-      
-      # When the continue button is clicked, show the tabset
-      observeEvent(input$continueBtn, {
-        hide("h1")
-        hide("text-register")
-        hide("register-link")
-        hide("username")
-        hide("continueBtn")
-        output$tabset_ui <- renderUI({
-          div(
-            id = 'sidebarpanel', 
-            sidebarPanel(
-              h3(id = "welcome-msg", "Welcome, ", input$username),
-              selectInput(inputId = "courses",
-                          label = "Select one of your courses:",
-                          choices = dbGetQuery(con, paste0("
-                      SELECT DISTINCT course_name FROM courses 
-                      JOIN teaching ON teaching.course_id = courses.course_id
-                      JOIN users ON users.user_id = teaching.user_id
-                      WHERE users.username = '", input$username, "'"
-                          ))$course_name,
-                          selected = "-- Select an option"),
-              checkboxGroupInput(inputId = 'groups',
-                                 label = 'Select the group(s) for analysis:',
-                                 choices = {
-                                   course_id <- dbGetQuery(con, paste0("
-                               SELECT DISTINCT course_id FROM courses
-                               WHERE course_name = '", input$courses, "'"))$course_id
-                                   
-                                   group_names <- dbGetQuery(con, paste0("
-                               SELECT DISTINCT g.Group_name FROM teaching t
-                               JOIN groups g ON g.Group_id = t.Group_id
-                               WHERE t.User_id = (SELECT User_id FROM users
-                                 WHERE Username = '", input$username, "'
-                               ) AND t.Course_id = '", course_id, "'"))$Group_name
-                                   
-                                   group_names
-                                 }),
-              selectInput(inputId = "tests",
-                          label = "Select the test:",
-                          choices = {
-                            course_id <- dbGetQuery(con, paste0("
-                        SELECT DISTINCT course_id FROM courses WHERE course_name = '", 
-                        input$courses, "'"))$course_id
-                            
-                            teach_ids <- dbGetQuery(con, paste0("
-                        SELECT DISTINCT teach_id FROM teaching
-                        WHERE User_id = (SELECT User_id FROM users
-                          WHERE Username = '", input$username, "'
-                        ) AND Course_id = '", course_id, "'"))$teach_id
-                            
-                            test_ids <- dbGetQuery(con, paste0("
-                        SELECT DISTINCT test_id FROM teaching
-                        WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
-                            
-                            test_topics <- dbGetQuery(con, paste0("
-                        SELECT DISTINCT test_topic FROM tests WHERE test_id IN (", 
-                        paste(test_ids, collapse = ","), ")"))$test_topic
-                            
-                            test_topics
-                          },
-                          selected = "-- Select an option")
-                          
-            ),
-            
-              
-              
-            
-            
-            tabsetPanel(
-              id = "tabset",
-              # Tab 1
-              tabPanel(title = "Tab 1", "This is the content of Tab 1"),
-              # Tab 2
-              tabPanel(title = "Tab 2", "This is the content of Tab 2"),
-              # Tab 3
-              tabPanel(title = "Tab 3", "This is the content of Tab 3")
-            )
-          )
-        })
-      })
-      
-      # Update the checkbox options whenever the courses selection changes
-      observeEvent(input$courses, {
-        # Get the user_id for the selected username
-        user_id_val <- user_id()
-        
-        # Get the group names for the selected course
-        group_names <- dbGetQuery(con, paste0("
-                          SELECT DISTINCT courses.group_name 
-                          FROM courses 
-                          JOIN teaching ON courses.course_id = teaching.course_id 
-                          WHERE teaching.user_id = '", user_id_val, "' AND teaching.course_id IN (
-                              SELECT DISTINCT courses.course_id 
-                              FROM courses 
-                              JOIN teaching ON courses.course_id = teaching.course_id 
-                              WHERE teaching.user_id = '", user_id_val, "' AND courses.course_name = '", input$courses, "'
-                          )
-                      "))$group_name
-        
-        # Update the checkbox options - WHEN CHECKED DISAPPEARS
-        updateCheckboxGroupInput(session, "groups", choices = group_names)
-      })
-      
-    }
-  )
-}
-# Run the app
-shinyApp(ui, server)
-
-#--------------------------------------------------------------------------------
-#--------------------------------------------------------------------------------
-#--------------------------------------------------------------------------------
-#--------------------------------------------------------------------------------
-
-# R6 classes
-# Define the database connection
-con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
+# -------------------------------------------------------------------------------------------#
+# ----------------------- R6 classes --------------------------------------------------------#
 
 # Define the R6 classes for each table
 # users - ok SQL working
@@ -233,54 +56,54 @@ users <- R6Class("users",
 
 # groups - Ok SQL working
 groups <- R6Class("groups",
-                 public = list(
-                   group_id = NULL,
-                   group_name = NULL,
-                   
-                   initialize = function(group_name) {
-                     self$group_name <- group_name
-                     groupid <- dbGetQuery(con, "SELECT group_id FROM groups ORDER BY group_id DESC LIMIT 1")
-                     if (nrow(groupid) == 0) {
-                       self$group_id <- 1
-                     } else {
-                       self$group_id <- groupid + 1
-                     }
-                     
-                     invisible(self)
-                   },
-                   
-                   insert = function() {
-                     query <- paste0("INSERT INTO groups (group_id, group_name) VALUES (", 
-                                     self$group_id, ", '", self$group_name, "')")
-                     dbExecute(con, query)
-                   }
-                 )
-)
-
-# days_of_week - Ok SQL working
-days_of_week <- R6Class("days_of_weeks",
                   public = list(
-                    id_days = NULL,
-                    days = NULL,
+                    group_id = NULL,
+                    group_name = NULL,
                     
-                    initialize = function(days) {
-                      self$days <- days
-                      dayid <- dbGetQuery(con, "SELECT id_days FROM days_of_week ORDER BY id_days DESC LIMIT 1")
-                      if (nrow(dayid) == 0) {
-                        self$id_days <- 1
+                    initialize = function(group_name) {
+                      self$group_name <- group_name
+                      groupid <- dbGetQuery(con, "SELECT group_id FROM groups ORDER BY group_id DESC LIMIT 1")
+                      if (nrow(groupid) == 0) {
+                        self$group_id <- 1
                       } else {
-                        self$id_days <- dayid + 1
+                        self$group_id <- groupid + 1
                       }
                       
                       invisible(self)
                     },
                     
                     insert = function() {
-                      query <- paste0("INSERT INTO days_of_week (id_days, days) VALUES (", 
-                                      self$id_days, ", '", self$days, "')")
+                      query <- paste0("INSERT INTO groups (group_id, group_name) VALUES (", 
+                                      self$group_id, ", '", self$group_name, "')")
                       dbExecute(con, query)
                     }
                   )
+)
+
+# days_of_week - Ok SQL working
+days_of_week <- R6Class("days_of_weeks",
+                        public = list(
+                          id_days = NULL,
+                          days = NULL,
+                          
+                          initialize = function(days) {
+                            self$days <- days
+                            dayid <- dbGetQuery(con, "SELECT id_days FROM days_of_week ORDER BY id_days DESC LIMIT 1")
+                            if (nrow(dayid) == 0) {
+                              self$id_days <- 1
+                            } else {
+                              self$id_days <- dayid + 1
+                            }
+                            
+                            invisible(self)
+                          },
+                          
+                          insert = function() {
+                            query <- paste0("INSERT INTO days_of_week (id_days, days) VALUES (", 
+                                            self$id_days, ", '", self$days, "')")
+                            dbExecute(con, query)
+                          }
+                        )
 )
 
 # tests - Ok SQL working
@@ -382,31 +205,31 @@ courses <- R6Class("courses",
 )
 # schedules - Ok SQL working
 schedules <- R6Class("schedules",
-                   public = list(
-                     schedule_id = NULL,
-                     start_time = "00:00",
-                     end_time = "17:30",
-                     initialize = function(start_time, end_time) {
-                       self$start_time <- start_time
-                       self$end_time <- end_time
+                     public = list(
+                       schedule_id = NULL,
+                       start_time = "00:00",
+                       end_time = "17:30",
+                       initialize = function(start_time, end_time) {
+                         self$start_time <- start_time
+                         self$end_time <- end_time
+                         
+                         scheduleid <- dbGetQuery(con, "SELECT schedule_id FROM schedules ORDER BY schedule_id DESC LIMIT 1")
+                         if (nrow(scheduleid) == 0) {
+                           self$schedule_id <- 1
+                         } else {
+                           self$schedule_id <- scheduleid + 1
+                         }
+                         
+                         invisible(self)
+                       },
                        
-                       scheduleid <- dbGetQuery(con, "SELECT schedule_id FROM schedules ORDER BY schedule_id DESC LIMIT 1")
-                       if (nrow(scheduleid) == 0) {
-                         self$schedule_id <- 1
-                       } else {
-                         self$schedule_id <- scheduleid + 1
+                       insert = function() {
+                         query <- paste0("INSERT INTO schedules (schedule_id, start_time, end_time) VALUES (",
+                                         self$schedule_id, ", '", self$start_time, "', '", self$end_time, "')")
+                         
+                         dbExecute(con, query)
                        }
-                       
-                       invisible(self)
-                     },
-                     
-                     insert = function() {
-                       query <- paste0("INSERT INTO schedules (schedule_id, start_time, end_time) VALUES (",
-                                       self$schedule_id, ", '", self$start_time, "', '", self$end_time, "')")
-                       
-                       dbExecute(con, query)
-                     }
-                   )
+                     )
 )
 
 # questions - Ok SQL connection working
@@ -449,8 +272,7 @@ questions <- R6Class("questions",
                      )
 )
 
-
-# TEST R6 CLASSES - all ok
+# ------------------------ TEST R6 CLASSES - all ok -------------------------------------------#
 # tested - ok
 test1 <- users$new("DQN")
 test1$insert()
@@ -497,3 +319,191 @@ dbGetQuery(con, "SELECT * FROM schedules")
 test6 <- teaching$new(5,3,3,5,12,8,8)
 test6$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
+
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+
+# Shiny App
+if (interactive()) {
+  library("shiny")
+  library("shinyjs")
+  library("RSQLite")
+  con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
+  
+  shinyApp(
+    
+    ui <- fluidPage(
+      useShinyjs(),
+      h1(id = 'h1', "Welcome to the Automatic R grader management tool!"),
+      
+      # Dropdown to select the username
+      selectInput(
+        inputId = "username",
+        label = "Select your username:",
+        choices = c(dbGetQuery(con, "SELECT DISTINCT username FROM users")$username),
+        selected = "-- Please select your username"
+      ),
+      
+      # Button to continue
+      actionButton(
+        inputId = "continueBtn",
+        label = "Continue",
+        disabled = TRUE
+      ),
+      
+      # Hyperlink to register
+      p(HTML("<p id='text-register'>Are you new? 
+         <a href='#' id='register-link'>Register here</a></p>")),
+      
+      # Tabset with 3 tabs, will show after clicking 'Continue'
+      uiOutput("tabset_ui")
+    ),
+    
+    # Define the server
+    server <- function(input, output, session) {
+      
+      # Reactive expression to get the user_id from the selected username
+      user_id <- reactive({
+        if (input$username == "-- Please select your username") {
+          0
+        } else {
+          dbGetQuery(con, paste0("SELECT user_id FROM users WHERE username = '", input$username, "'"))$user_id
+        }
+      })
+      
+      # Enable continue button if username is selected
+      observeEvent(input$username, {
+        # Get the user_id for the selected username
+        user_id_val <- user_id()
+        
+        # Debugging statement
+        print(user_id_val)
+        
+        # Enable the continue button only if the user_id is not 0
+        if (user_id_val != 0) {
+          shinyjs::enable("continueBtn")
+        } else {
+          shinyjs::disable("continueBtn")
+        }
+        print(input$username)
+      })
+      
+      # Get the test IDs for the selected course
+      test_ids <- reactive({
+        req(input$courses)
+        
+        course_id <- dbGetQuery(con, paste0("
+          SELECT DISTINCT course_id FROM courses WHERE course_name = '",
+                                            input$courses, "'"))$course_id
+        
+        teach_ids <- dbGetQuery(con, paste0("
+          SELECT DISTINCT teach_id FROM teaching
+          WHERE user_id = (SELECT user_id FROM users
+                            WHERE username = '", input$username, "'
+          ) AND course_id = '", course_id, "'"))$teach_id
+        
+        dbGetQuery(con, paste0("
+          SELECT DISTINCT test_id FROM teaching
+          WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
+      })
+      
+      # When the continue button is clicked, show the tabset
+      observeEvent(input$continueBtn, {
+        hide("h1")
+        hide("text-register")
+        hide("register-link")
+        hide("username")
+        hide("continueBtn")
+        output$tabset_ui <- renderUI({
+          sidebarLayout(
+            sidebarPanel(
+              h3(id = "welcome-msg", "Welcome, ", input$username),
+              selectInput(
+                inputId = "courses",
+                label = "Select one of your courses:",
+                choices = dbGetQuery(con, paste0("
+                      SELECT DISTINCT course_name FROM courses 
+                      JOIN teaching ON teaching.course_id = courses.course_id
+                      JOIN users ON users.user_id = teaching.user_id
+                      WHERE users.username = '", input$username, "'"
+                ))$course_name
+              ),
+              checkboxGroupInput(
+                inputId = 'groups',
+                label = 'Select the group(s) for analysis:',
+                choices = NULL
+              ),
+              selectInput(
+                inputId = "tests",
+                label = "Select the test:",
+                choices = NULL
+              )
+            ),
+            mainPanel(
+              tabsetPanel(
+                id = "tabset",
+                # Tab 1
+                tabPanel(title = "Tab 1", "This is the content of Tab 1"),
+                # Tab 2
+                tabPanel(title = "Tab 2", "This is the content of Tab 2"),
+                # Tab 3
+                tabPanel(title = "Tab 3", "This is the content of Tab 3")
+              )
+            )
+          )
+        })
+      })
+      
+      # Update the checkbox options whenever the courses selection changes
+      observeEvent(input$courses, {
+        # Reset the selected value of the tests dropdown if the previous selection is not available in the updated choices
+        if (!is.null(input$tests) && !(input$tests %in% dbGetQuery(con, paste0("
+                      SELECT DISTINCT test_topic FROM tests WHERE test_id IN (",
+                                                                               paste(test_ids(), collapse = ","), ")"))$test_topic)) {
+          updateSelectInput(session, "tests", selected = NULL)
+        }
+        
+        # Get the user_id for the selected username
+        user_id_val <- user_id()
+        
+        # Get the group names for the selected course
+        group_names <- dbGetQuery(con, paste0("
+          SELECT DISTINCT groups.group_name FROM courses JOIN teaching 
+          ON courses.course_id = teaching.course_id JOIN groups ON 
+          teaching.group_id = groups.group_id WHERE teaching.user_id = '", user_id_val,
+                                              "' AND teaching.course_id IN (SELECT DISTINCT courses.course_id FROM courses 
+          JOIN teaching ON courses.course_id = teaching.course_id WHERE teaching.user_id = '",
+                                              user_id_val, "' AND courses.course_name = '", input$courses, "')"))$group_name
+        
+        # Update the checkbox options
+        updateCheckboxGroupInput(session, "groups", choices = group_names)
+      })
+      
+      # Update the test choices whenever the courses or groups selection changes
+      observeEvent(c(input$courses, input$groups), {
+        # Get the user_id for the selected username
+        user_id_val <- user_id()
+        
+        # Get the test topics for the selected course and groups
+        test_topics <- dbGetQuery(con, paste0("
+          SELECT DISTINCT tests.test_topic FROM tests JOIN teaching 
+          ON tests.test_id = teaching.test_id JOIN groups ON 
+          teaching.group_id = groups.group_id WHERE teaching.user_id = '", user_id_val,
+                                              "' AND teaching.course_id IN (SELECT DISTINCT courses.course_id FROM courses 
+          JOIN teaching ON courses.course_id = teaching.course_id WHERE teaching.user_id = '",
+                                              user_id_val, "' AND courses.course_name = '", input$courses, "')
+          AND groups.group_name IN ('", paste(input$groups, collapse = "','"), "')"))$test_topic
+        
+        # Update the choices for the tests dropdown
+        updateSelectInput(session, "tests", choices = test_topics)
+      })
+      
+    }
+  )
+}
+
+# Run the app
+shinyApp(ui, server)
+
