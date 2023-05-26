@@ -326,6 +326,7 @@ dbGetQuery(con, "SELECT * FROM teaching")
 #------------------------------------------------------------------------------------------------
 
 # Shiny App
+# Shiny App
 if (interactive()) {
   library("shiny")
   library("shinyjs")
@@ -482,7 +483,7 @@ if (interactive()) {
       })
       
       # Update the test choices whenever the courses or groups selection changes
-      observeEvent(c(input$courses, input$groups), {
+      observeEvent({input$courses; input$groups}, {
         # Get the user_id for the selected username
         user_id_val <- user_id()
         
