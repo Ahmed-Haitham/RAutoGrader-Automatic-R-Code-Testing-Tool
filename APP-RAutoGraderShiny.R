@@ -12,7 +12,7 @@ if (length(missing_packages) > 0) {
 }
 
 # Load required packages
-#lapply(required_packages, library, character.only = TRUE)
+lapply(required_packages, library, character.only = TRUE)
 
 #renv::restore()
 
@@ -96,18 +96,53 @@ if (interactive()) {
               selectInput(inputId = "courses",
                           label = "Select one of your courses:",
                           choices = dbGetQuery(con, paste0("
-                        SELECT DISTINCT course_name FROM courses JOIN 
-                        teaching ON teaching.course_id = courses.course_id
-                        JOIN users ON users.user_id = teaching.user_id
-                        WHERE users.username = '", input$username, "'"))$course_name,
+                      SELECT DISTINCT course_name FROM courses 
+                      JOIN teaching ON teaching.course_id = courses.course_id
+                      JOIN users ON users.user_id = teaching.user_id
+                      WHERE users.username = '", input$username, "'"
+                          ))$course_name,
                           selected = "-- Select an option"),
               checkboxGroupInput(inputId = 'groups',
                                  label = 'Select the group(s) for analysis:',
-                                 choices = NULL),
+                                 choices = {
+                                   course_id <- dbGetQuery(con, paste0("
+                               SELECT DISTINCT course_id FROM courses
+                               WHERE course_name = '", input$courses, "'"))$course_id
+                                   
+                                   group_names <- dbGetQuery(con, paste0("
+                               SELECT DISTINCT g.Group_name FROM teaching t
+                               JOIN groups g ON g.Group_id = t.Group_id
+                               WHERE t.User_id = (SELECT User_id FROM users
+                                 WHERE Username = '", input$username, "'
+                               ) AND t.Course_id = '", course_id, "'"))$Group_name
+                                   
+                                   group_names
+                                 }),
               selectInput(inputId = "tests",
                           label = "Select the test:",
-                          choices = c('missing query HERE')
-                          )
+                          choices = {
+                            course_id <- dbGetQuery(con, paste0("
+                        SELECT DISTINCT course_id FROM courses WHERE course_name = '", 
+                        input$courses, "'"))$course_id
+                            
+                            teach_ids <- dbGetQuery(con, paste0("
+                        SELECT DISTINCT teach_id FROM teaching
+                        WHERE User_id = (SELECT User_id FROM users
+                          WHERE Username = '", input$username, "'
+                        ) AND Course_id = '", course_id, "'"))$teach_id
+                            
+                            test_ids <- dbGetQuery(con, paste0("
+                        SELECT DISTINCT test_id FROM teaching
+                        WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
+                            
+                            test_topics <- dbGetQuery(con, paste0("
+                        SELECT DISTINCT test_topic FROM tests WHERE test_id IN (", 
+                        paste(test_ids, collapse = ","), ")"))$test_topic
+                            
+                            test_topics
+                          },
+                          selected = "-- Select an option")
+                          
             ),
             
               
@@ -349,9 +384,11 @@ courses <- R6Class("courses",
 schedules <- R6Class("schedules",
                    public = list(
                      schedule_id = NULL,
-                     start_time = NULL,
-                     end_time = NULL,
+                     start_time = "00:00",
+                     end_time = "17:30",
                      initialize = function(start_time, end_time) {
+                       self$start_time <- start_time
+                       self$end_time <- end_time
                        
                        scheduleid <- dbGetQuery(con, "SELECT schedule_id FROM schedules ORDER BY schedule_id DESC LIMIT 1")
                        if (nrow(scheduleid) == 0) {
@@ -360,16 +397,12 @@ schedules <- R6Class("schedules",
                          self$schedule_id <- scheduleid + 1
                        }
                        
-                       self$start_time <- start_time
-                       self$end_time <- end_time
-                       
-                       
                        invisible(self)
                      },
                      
                      insert = function() {
-                       query <- paste0("INSERT INTO courses (course_id, course_name) VALUES (", 
-                                       self$course_id, ", '", self$course_name, "')")
+                       query <- paste0("INSERT INTO schedules (schedule_id, start_time, end_time) VALUES (",
+                                       self$schedule_id, ", '", self$start_time, "', '", self$end_time, "')")
                        
                        dbExecute(con, query)
                      }
@@ -386,9 +419,9 @@ questions <- R6Class("questions",
                        question_answer = NULL,
                        answers_filepath = "None",
                        
-                       initialize = function(question_number, question_description,
+                       initialize = function(test_id, question_number, question_description,
                                              question_answer, answers_filepath = "None") {
-                         
+                         self$test_id <- test_id
                          self$question_number <- question_number
                          self$question_description <- question_description
                          self$question_answer <- question_answer
@@ -400,14 +433,6 @@ questions <- R6Class("questions",
                          } else {
                            self$question_id <- questid + 1
                          }
-                         
-                         result <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
-                         if (nrow(result) == 0) {
-                           self$test_id <- 1
-                         } else {
-                           self$test_id <- result
-                         }
-                         
                          
                          invisible(self)
                        },
@@ -427,30 +452,48 @@ questions <- R6Class("questions",
 
 # TEST R6 CLASSES - all ok
 # tested - ok
-maria <- users$new("Maria Kubara")
-maria$insert()
+test1 <- users$new("DQN")
+test1$insert()
 dbGetQuery(con, "SELECT * FROM users")
 
 # Create the groups
 # tested - ok 
-r_intro_gr1 <- courses$new("R intro", "gr 1", "9-10.45", "Mon")
-r_intro_gr1$insert()
+test2 <- groups$new("gr 11")
+test2$insert()
+dbGetQuery(con, "SELECT * FROM groups")
+
+# create new course
+# tested - ok
+test3 <- courses$new("Adv. Econometrics")
+test3$insert()
 dbGetQuery(con, "SELECT * FROM courses")
 
 # create tests
 # tested - ok
-loops <- tests$new("Data types")
-loops$insert()
+test4 <- tests$new("Shiny I")
+test4$insert()
 dbGetQuery(con, "SELECT * FROM tests")
 
 # Create questions
 # tested - ok
-q1 <- questions$new(1, "choose the correct answer:", "vector")
-q1$insert()
+test5 <- questions$new(3,1, "choose the correct answer:", "vector")
+test5$insert()
 dbGetQuery(con, "SELECT * FROM questions")
+
+# create new days
+# tested - ok
+test6 <- days_of_week$new("testing")
+test6$insert()
+dbGetQuery(con, "SELECT * FROM days_of_week")
+
+# create new schedule
+# tested - ok
+test7 <- schedules$new("20:15", "21:45")
+test7$insert()
+dbGetQuery(con, "SELECT * FROM schedules")
 
 # Create the teaching relationship - table
 # tested - ok 
-maria_teaching_r_intro_gr1 <- teaching$new(4,1,1,1)
-maria_teaching_r_intro_gr1$insert()
+test6 <- teaching$new(5,3,3,5,12,8,8)
+test6$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
