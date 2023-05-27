@@ -326,7 +326,6 @@ dbGetQuery(con, "SELECT * FROM teaching")
 #------------------------------------------------------------------------------------------------
 
 # Shiny App
-# Shiny App
 if (interactive()) {
   library("shiny")
   library("shinyjs")
@@ -446,7 +445,26 @@ if (interactive()) {
               tabsetPanel(
                 id = "tabset",
                 # Tab 1
-                tabPanel(title = "Tab 1", "This is the content of Tab 1"),
+                tabPanel(title = "CREATE", 
+                         fluidRow(
+                           column(
+                             width = 6,
+                             # Content
+                             h3("Creation of a new test"),
+                             p("Please fill in all the fields below:"),
+                             
+                             # Formulaire
+                             textInput(inputId = "testtopic", 
+                                       label = "Test topic/nam", value = ""),
+                             numericInput(inputId = "questnumber", label = "Question number ", 
+                                          value = "", min = 1, max = 99),
+                             textInput(inputId = "question", label = "Question description ", value = ""),
+                             textInput(inputId = "questanswer", 
+                                       label = "Question answer (please write the answer in R code) ", 
+                                       value = "")
+                           )
+                         )),
+                    
                 # Tab 2
                 tabPanel(title = "Tab 2", "This is the content of Tab 2"),
                 # Tab 3
