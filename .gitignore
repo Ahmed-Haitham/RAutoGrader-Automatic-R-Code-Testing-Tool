@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 *.Rproj
-*.sqlite
+.sqlite
 mydatabase.db
