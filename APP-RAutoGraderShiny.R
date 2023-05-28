@@ -320,10 +320,10 @@ test6 <- teaching$new(5,3,3,5,12,8,8)
 test6$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
 
-#------------------------------------------------------------------------------------------------
-#------------------------------------------------------------------------------------------------
-#------------------------------------------------------------------------------------------------
-#------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------
 
 # Shiny App
 if (interactive()) {
@@ -336,7 +336,9 @@ if (interactive()) {
     
     ui <- fluidPage(
       useShinyjs(),
-      h1(id = 'h1', "Welcome to the Automatic R grader management tool!"),
+      h1(id = 'h1',style = "text-align: center;", "Welcome to the Automatic R grader management tool!"),
+      hr(),
+      br(),
       
       # Dropdown to select the username
       selectInput(
@@ -445,26 +447,67 @@ if (interactive()) {
               tabsetPanel(
                 id = "tabset",
                 # Tab 1
-                tabPanel(title = "CREATE", 
-                         fluidRow(
-                           column(
-                             width = 6,
-                             # Content
-                             h3("Creation of a new test"),
-                             p("Please fill in all the fields below:"),
+                tabPanel(title = "CREATE",
+                         br(),
+                         tabsetPanel(
+                           tabPanel(
+                             title = 'New course',
+                             h3(id = "h3newcourse", 'Add to your profile a new course'),
+                             hr(),
+                             p(id = "h5ncdescription", 'In this section you will be able to
+                                 add a new course to your courses list', br(),
+                               'Please only use this option if the course you want add is NOT available in your current courses list.')
                              
-                             # Formulaire
-                             textInput(inputId = "testtopic", 
-                                       label = "Test topic/nam", value = ""),
-                             numericInput(inputId = "questnumber", label = "Question number ", 
-                                          value = "", min = 1, max = 99),
-                             textInput(inputId = "question", label = "Question description ", value = ""),
+                             
+                           ),
+                           
+                           tabPanel(
+                             title = "Add new group"
+                             
+                             
+                           ),
+                           
+                           tabPanel(
+                             title = "New test",
+                             # Creation form
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 selectInput(
+                                   inputId = "courses2",
+                                   label = "Select the course to assign the test: ",
+                                   choices = dbGetQuery(con, paste0("
+                                   SELECT DISTINCT course_name FROM courses JOIN teaching 
+                                   ON teaching.course_id = courses.course_id JOIN users 
+                                   ON users.user_id = teaching.user_id WHERE users.username = '", 
+                                                                    input$username, "'"))$course_name
+                                 )
+                               ),
+                               column(
+                                 width = 6,
+                                 checkboxGroupInput(
+                                   inputId = 'groups2',
+                                   label = 'Select the group(s) that had the test:',
+                                   choices = NULL
+                                 )
+                               )
+                             ),
+                             
+                             hr(),
+                             textInput(inputId = "testtopic", label = "Test topic/name", value = ""),
+                             numericInput(inputId = "questnumber", label = "Question number: ", value = 1, min = 1, max = 99),
+                             textInput(inputId = "question", label = "Question description: ", value = ""),
                              textInput(inputId = "questanswer", 
-                                       label = "Question answer (please write the answer in R code) ", 
-                                       value = "")
+                                       label = "Question answer (please write the answer in R code, 
+                                       if it is the case, otherwise input the correct answer): ", value = ""),
+                             
+                             # Buttons
+                             actionButton(inputId = "submitBtn", label = "Submit"),
+                             actionButton(inputId = "addQuestionBtn", label = "Add another question")
                            )
-                         )),
-                    
+                         )
+                ),
+                           
                 # Tab 2
                 tabPanel(title = "Tab 2", "This is the content of Tab 2"),
                 # Tab 3
@@ -475,12 +518,12 @@ if (interactive()) {
         })
       })
       
-      # Update the checkbox options whenever the courses selection changes
+      # Update the checkbox options (sidebar panel) whenever the courses selection changes
       observeEvent(input$courses, {
         # Reset the selected value of the tests dropdown if the previous selection is not available in the updated choices
         if (!is.null(input$tests) && !(input$tests %in% dbGetQuery(con, paste0("
-                      SELECT DISTINCT test_topic FROM tests WHERE test_id IN (",
-                                                                               paste(test_ids(), collapse = ","), ")"))$test_topic)) {
+                      SELECT DISTINCT test_topic 
+                      FROM tests WHERE test_id IN (", paste(test_ids(), collapse = ","), ")"))$test_topic)) {
           updateSelectInput(session, "tests", selected = NULL)
         }
         
@@ -488,17 +531,26 @@ if (interactive()) {
         user_id_val <- user_id()
         
         # Get the group names for the selected course
-        group_names <- dbGetQuery(con, paste0("
-          SELECT DISTINCT groups.group_name FROM courses JOIN teaching 
-          ON courses.course_id = teaching.course_id JOIN groups ON 
-          teaching.group_id = groups.group_id WHERE teaching.user_id = '", user_id_val,
-                                              "' AND teaching.course_id IN (SELECT DISTINCT courses.course_id FROM courses 
-          JOIN teaching ON courses.course_id = teaching.course_id WHERE teaching.user_id = '",
-                                              user_id_val, "' AND courses.course_name = '", input$courses, "')"))$group_name
+        group_names <- dbGetQuery(con, paste0("SELECT group_info FROM group_info_view WHERE user_id = '", 
+        user_id_val, "'AND course_name = '", input$courses, "'"))$group_info
         
         # Update the checkbox options
         updateCheckboxGroupInput(session, "groups", choices = group_names)
       })
+      
+      # Update the drop-down options for groups (CREATE tab) whenever the courses selection changes
+      observeEvent(input$courses2, {
+        # Get the user_id for the selected username
+        user_id_val2 <- user_id()
+        
+        # Get the group names for the selected course
+        group_names2 <- dbGetQuery(con, paste0("SELECT group_info FROM group_info_view WHERE user_id = '", 
+                                               user_id_val2, "'AND course_name = '", input$courses2, "'"))$group_info
+        # Update the dropdown options
+        updateCheckboxGroupInput(session, "groups2", choices = group_names2)
+      })
+      #
+      
       
       # Update the test choices whenever the courses or groups selection changes
       observeEvent({input$courses; input$groups}, {
