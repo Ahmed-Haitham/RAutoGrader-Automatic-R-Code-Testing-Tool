@@ -451,24 +451,36 @@ if (interactive()) {
                          br(),
                          tabsetPanel(
                            tabPanel(
-                             title = 'New course',
-                             h3(id = "h3newcourse", 'Add to your profile a new course'),
+                             title = 'NEW COURSE',
+                             h3(id = "h3newcourse", 'Create a new course'),
                              hr(),
-                             p(id = "h5ncdescription", 'In this section you will be able to
-                                 add a new course to your courses list', br(),
+                             p(id = "h5ncdescription", 'Are you teaching a new course? In this section you will be able to
+                                 add a new course to your courses list.', br(),
                                'Please only use this option if the course you want add is NOT available in your current courses list.')
                              
                              
                            ),
                            
                            tabPanel(
-                             title = "Add new group"
+                             title = "NEW GROUP",
+                             h3(id = "h3newgroup", 'Create a new group'),
+                             hr(),
+                             p(id = "h5ncdescription", 'In this section you will be able to
+                                 add a new group to an existing course from your courses list.', br(),
+                               'Please only use this option if the course already exists and you just want to assign a new group to it.')
+                             
                              
                              
                            ),
                            
                            tabPanel(
-                             title = "New test",
+                             title = "NEW TEST",
+                             h3(id = "h3newtest", 'Create a new test'),
+                             hr(),
+                             p(id = "h5ncdescription", 'In this section you will be able to
+                                 add a new test to and assigned it to the course and groups of your choice.', br(),
+                               'You can assign one test to one course but the test can be assigned to many groups if applicable.'),
+                             
                              # Creation form
                              fluidRow(
                                column(
@@ -498,7 +510,7 @@ if (interactive()) {
                              numericInput(inputId = "questnumber", label = "Question number: ", value = 1, min = 1, max = 99),
                              textInput(inputId = "question", label = "Question description: ", value = ""),
                              textInput(inputId = "questanswer", 
-                                       label = "Question answer (please write the answer in R code, 
+                                       label = "Question answer (please write the answer in R code 
                                        if it is the case, otherwise input the correct answer): ", value = ""),
                              
                              # Buttons
