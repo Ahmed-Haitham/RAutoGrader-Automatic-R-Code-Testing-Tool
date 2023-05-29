@@ -111,9 +111,10 @@ tests <- R6Class("tests",
                  public = list(
                    test_id = NULL,
                    test_topic = NULL,
+                   teach_id = NULL,
                    
-                   initialize = function(test_topic) {
-                     self$test_topic <- test_topic
+                   initialize = function(test_topic, teach_id) {
+                     
                      testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
                      if (nrow(testid) == 0) {
                        self$test_id <- 1
@@ -121,12 +122,15 @@ tests <- R6Class("tests",
                        self$test_id <- testid + 1
                      }
                      
+                     self$test_topic <- test_topic
+                     self$teach_id <- teach_id
+                     
                      invisible(self)
                    },
                    
                    insert = function() {
-                     query <- paste0("INSERT INTO tests (test_id, test_topic) VALUES (", 
-                                     self$test_id, ", '", self$test_topic, "')")
+                     query <- paste0("INSERT INTO tests (test_id, test_topic, teach_id) VALUES (", 
+                                     self$test_id, ", '", self$test_topic, "', '", self$teach_id, "')")
                      dbExecute(con, query)
                    }
                  )
@@ -138,13 +142,11 @@ teaching <- R6Class("teaching",
                       teach_id = NULL,
                       user_id = NULL,
                       course_id = NULL,
-                      test_id = NULL,
-                      question_id = NULL,
                       group_id = NULL,
                       id_days = NULL,
                       schedule_id = NULL,
                       
-                      initialize = function(user_id, course_id, test_id, question_id, group_id, id_days, 
+                      initialize = function(user_id, course_id, group_id, id_days, 
                                             schedule_id) {
                         teach <- dbGetQuery(con, "SELECT teach_id FROM teaching ORDER BY teach_id DESC LIMIT 1")
                         if (nrow(teach) == 0) {
@@ -155,8 +157,6 @@ teaching <- R6Class("teaching",
                         
                         self$user_id <- user_id
                         self$course_id <- course_id
-                        self$test_id <- test_id
-                        self$question_id <- question_id
                         self$group_id <- group_id
                         self$id_days <- id_days
                         self$schedule_id <- schedule_id
@@ -166,15 +166,15 @@ teaching <- R6Class("teaching",
                       
                       insert = function() {
                         query <- paste0("INSERT INTO teaching (teach_id, user_id, course_id, 
-                                       test_id, question_id, group_id, id_days, schedule_id) VALUES (", 
+                                       group_id, id_days, schedule_id) VALUES (", 
                                         self$teach_id, ", ", self$user_id, ", '", self$course_id, "', '",
-                                        self$test_id, "', '", self$question_id, "', '", self$group_id, "', '",
-                                        self$id_days, "', '", self$schedule_id, "')")
+                                        self$group_id, "', '", self$id_days, "', '", self$schedule_id, "')")
                         
                         dbExecute(con, query)
                       }
                     )
 )
+
 
 # courses - Ok SQL working
 courses <- R6Class("courses",
@@ -292,7 +292,7 @@ dbGetQuery(con, "SELECT * FROM courses")
 
 # create tests
 # tested - ok
-test4 <- tests$new("Shiny I")
+test4 <- tests$new("Shiny I", 3)
 test4$insert()
 dbGetQuery(con, "SELECT * FROM tests")
 
@@ -316,7 +316,7 @@ dbGetQuery(con, "SELECT * FROM schedules")
 
 # Create the teaching relationship - table
 # tested - ok 
-test6 <- teaching$new(5,3,3,5,12,8,8)
+test6 <- teaching$new(5,3,12,8,8)
 test6$insert()
 dbGetQuery(con, "SELECT * FROM teaching")
 
@@ -336,9 +336,9 @@ if (interactive()) {
     
     ui <- fluidPage(
       useShinyjs(),
+      h4(id = 'h1home', style = 'text-align: center;', '- Automatic R Grader tool 2023 -'),
       h1(id = 'h1',style = "text-align: center;", "Welcome to the Automatic R grader management tool!"),
       hr(),
-      br(),
       
       # Dropdown to select the username
       selectInput(
@@ -407,7 +407,7 @@ if (interactive()) {
           ) AND course_id = '", course_id, "'"))$teach_id
         
         dbGetQuery(con, paste0("
-          SELECT DISTINCT test_id FROM teaching
+          SELECT DISTINCT test_id FROM tests
           WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
       })
       
@@ -456,8 +456,29 @@ if (interactive()) {
                              hr(),
                              p(id = "h5ncdescription", 'Are you teaching a new course? In this section you will be able to
                                  add a new course to your courses list.', br(),
-                               'Please only use this option if the course you want add is NOT available in your current courses list.')
+                               'Please only use this option if the course you want add is NOT available in your current courses list.'),
+                             textInput(inputId = 'newcourse', label = 'Course name: '),
+                             selectInput(inputId = 'grouplist', label = 'Choose group: ', choices = 
+                                           dbGetQuery(con, paste0("SELECT * FROM groups"))$group_name),
+                             selectInput(inputId = 'dayclass', label = 'Teaching day: ', choices = 
+                                           dbGetQuery(con, paste0("SELECT * FROM days_of_week"))$days
+                             ),
                              
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'starttime', label = 'Starts at: ', choices = 
+                                               dbGetQuery(con, paste0("SELECT * FROM schedules"))$start_time
+                                 )
+                               ),
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'endtime', label = 'Until: ', choices = 
+                                               dbGetQuery(con, paste0("SELECT * FROM schedules"))$end_time)
+                               )
+                             ),
+                             # Button                                         
+                             actionButton(inputId = 'newcourseteach', label = 'Save')
                              
                            ),
                            
@@ -467,7 +488,7 @@ if (interactive()) {
                              hr(),
                              p(id = "h5ncdescription", 'In this section you will be able to
                                  add a new group to an existing course from your courses list.', br(),
-                               'Please only use this option if the course already exists and you just want to assign a new group to it.')
+                               'Please only use this option if the course already exists and you just want to assign a new group to it.'),
                              
                              
                              
@@ -504,22 +525,57 @@ if (interactive()) {
                                  )
                                )
                              ),
-                             
+                             p("There are 2 options to create your new test. Through an R file attachment or through manual input.",
+                               tags$ul(
+                                 tags$li(tags$b("Attachment: "), "you can attach an .R file with the questions and answers. 
+                                 Please check the project description file to make sure your attachment has all the required variables."),
+                                 tags$li(tags$b("Manual input: "), "with this option, you will have to provide the questions' 
+                                         description and the correct answer")
+                               )
+                             ),
+                             br(),
+                             actionButton(inputId = "AttachBtn", label = "Attachment"),
+                             actionButton(inputId = "ManualBtn", label = "Manual input"),
+                             br(),
                              hr(),
                              textInput(inputId = "testtopic", label = "Test topic/name", value = ""),
-                             numericInput(inputId = "questnumber", label = "Question number: ", value = 1, min = 1, max = 99),
-                             textInput(inputId = "question", label = "Question description: ", value = ""),
-                             textInput(inputId = "questanswer", 
-                                       label = "Question answer (please write the answer in R code 
-                                       if it is the case, otherwise input the correct answer): ", value = ""),
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 numericInput(inputId = "questnumber", 
+                                              label = "Question number: ", 
+                                              value = 1, min = 1, max = 99)
+                               ),
+                               column(
+                                 width = 6,
+                                 numericInput(inputId = "questpoints", 
+                                              label = "Points if correct ", 
+                                              value = 0, min = 0, max = 500)
+                               )
+                             ),
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 textInput(inputId = "questanswer", 
+                                           label = "Question answer: ", value = "")
+                               ),
+                               column(
+                                 width = 6,
+                                 textInput(inputId = "question", label = "Question description: ", value = "")
+                               )
+                             ),
                              
                              # Buttons
                              actionButton(inputId = "submitBtn", label = "Submit"),
-                             actionButton(inputId = "addQuestionBtn", label = "Add another question")
+                             actionButton(inputId = "addQuestionBtn", label = "Add another question"),
+                             
+                             #Attachment
+                             fileInput(inputId = "attachField", label = "Choose the file to attach: ", accept = ".R"),
+                             actionButton(inputId = "attachBtn", label = "Attach")
                            )
                          )
                 ),
-                           
+                
                 # Tab 2
                 tabPanel(title = "Tab 2", "This is the content of Tab 2"),
                 # Tab 3
@@ -529,6 +585,13 @@ if (interactive()) {
           )
         })
       })
+      
+      #Buttons
+      # button CREATE - New course - aka 'Save' id= 'newcourseteach'
+      observeEvent(input$newcourseteach, {
+        # create new course using class courses$new(input$newcourse) and then $insert()
+      })
+      
       
       # Update the checkbox options (sidebar panel) whenever the courses selection changes
       observeEvent(input$courses, {
@@ -544,7 +607,7 @@ if (interactive()) {
         
         # Get the group names for the selected course
         group_names <- dbGetQuery(con, paste0("SELECT group_info FROM group_info_view WHERE user_id = '", 
-        user_id_val, "'AND course_name = '", input$courses, "'"))$group_info
+                                              user_id_val, "'AND course_name = '", input$courses, "'"))$group_info
         
         # Update the checkbox options
         updateCheckboxGroupInput(session, "groups", choices = group_names)
@@ -570,14 +633,11 @@ if (interactive()) {
         user_id_val <- user_id()
         
         # Get the test topics for the selected course and groups
-        test_topics <- dbGetQuery(con, paste0("
-          SELECT DISTINCT tests.test_topic FROM tests JOIN teaching 
-          ON tests.test_id = teaching.test_id JOIN groups ON 
-          teaching.group_id = groups.group_id WHERE teaching.user_id = '", user_id_val,
-                                              "' AND teaching.course_id IN (SELECT DISTINCT courses.course_id FROM courses 
-          JOIN teaching ON courses.course_id = teaching.course_id WHERE teaching.user_id = '",
-                                              user_id_val, "' AND courses.course_name = '", input$courses, "')
-          AND groups.group_name IN ('", paste(input$groups, collapse = "','"), "')"))$test_topic
+        test_topics <- dbGetQuery(con, paste0("SELECT tests.test_topic FROM tests 
+        JOIN teaching ON tests.teach_id = teaching.teach_id JOIN group_info_view 
+        ON teaching.teach_id = group_info_view.teach_id WHERE teaching.user_id = '", user_id_val, "'
+      AND group_info_view.course_name = '", input$courses, "' 
+      AND group_info_view.group_info = '", input$groups, "'"))$test_topic
         
         # Update the choices for the tests dropdown
         updateSelectInput(session, "tests", choices = test_topics)
@@ -586,7 +646,3 @@ if (interactive()) {
     }
   )
 }
-
-# Run the app
-shinyApp(ui, server)
-
