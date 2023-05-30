@@ -213,7 +213,8 @@ schedules <- R6Class("schedules",
                          self$start_time <- start_time
                          self$end_time <- end_time
                          
-                         scheduleid <- dbGetQuery(con, "SELECT schedule_id FROM schedules ORDER BY schedule_id DESC LIMIT 1")
+                         scheduleid <- dbGetQuery(con, "SELECT schedule_id 
+                                                  FROM schedules ORDER BY schedule_id DESC LIMIT 1")
                          if (nrow(scheduleid) == 0) {
                            self$schedule_id <- 1
                          } else {
@@ -250,7 +251,8 @@ questions <- R6Class("questions",
                          self$question_answer <- question_answer
                          self$answers_filepath <- answers_filepath
                          
-                         questid <- dbGetQuery(con, "SELECT question_id FROM questions ORDER BY question_id DESC LIMIT 1")
+                         questid <- dbGetQuery(con, "SELECT question_id FROM questions 
+                                               ORDER BY question_id DESC LIMIT 1")
                          if (nrow(questid) == 0) {
                            self$question_id <- 1
                          } else {
@@ -454,9 +456,10 @@ if (interactive()) {
                              title = 'NEW COURSE',
                              h3(id = "h3newcourse", 'Create a new course'),
                              hr(),
-                             p(id = "h5ncdescription", 'Are you teaching a new course? In this section you will be able to
-                                 add a new course to your courses list.', br(),
-                               'Please only use this option if the course you want add is NOT available in your current courses list.'),
+                             p(id = "h5ncdescription", 'Are you teaching a new course? In this section you will be able 
+                                to add a new course to your courses list.', br(),
+                               'Please only use this option if the course you want add is NOT 
+                               available in your current courses list.'),
                              textInput(inputId = 'newcourse', label = 'Course name: '),
                              selectInput(inputId = 'grouplist', label = 'Choose group: ', choices = 
                                            dbGetQuery(con, paste0("SELECT * FROM groups"))$group_name),
@@ -488,10 +491,47 @@ if (interactive()) {
                              hr(),
                              p(id = "h5ncdescription", 'In this section you will be able to
                                  add a new group to an existing course from your courses list.', br(),
-                               'Please only use this option if the course already exists and you just want to assign a new group to it.'),
+                               'Please only use this option if the course already exists and you just 
+                               want to assign a new group to it.'),
+                             hr(),
+                             selectInput(inputId = 'slctcourseBtn', label = 'Select the course: ',
+                                         choices = dbGetQuery(con, paste0("
+                                   SELECT DISTINCT course_name FROM courses JOIN teaching 
+                                   ON teaching.course_id = courses.course_id JOIN users 
+                                   ON users.user_id = teaching.user_id WHERE users.username = '", 
+                                                                          input$username, "'"))$course_name),
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'newgroupsBtn', label = 'Select the group to add: ',
+                                             choices = dbGetQuery(con, paste0("SELECT group_name 
+                                                                          FROM groups WHERE group_id>0"))$group_name)
+                               ),
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'newdayBtn', label = 'Select the day: ', choices = 
+                                               dbGetQuery(con, paste0("SELECT days FROM days_of_week 
+                                                                      WHERE id_days>0"))$days)
+                                 )
+                             ),
+                             fluidRow(
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'newstartBtn', label = 'Select the start time of the course: ', 
+                                             choices = dbGetQuery(con, paste0("SELECT start_time FROM schedules 
+                                                                      WHERE schedule_id>0"))$start_time)
+                                 ),
+                               column(
+                                 width = 6,
+                                 selectInput(inputId = 'newendBtn', label = 'Select the end time of the course: ', 
+                                             choices = dbGetQuery(con, paste0("SELECT end_time FROM schedules 
+                                                                      WHERE schedule_id>0"))$end_time)
+                               )
+                             ),
                              
-                             
-                             
+                             #button
+                             actionButton(inputId = 'newgroupBtn', label = 'Save')
+                            
                            ),
                            
                            tabPanel(
@@ -500,7 +540,8 @@ if (interactive()) {
                              hr(),
                              p(id = "h5ncdescription", 'In this section you will be able to
                                  add a new test to and assigned it to the course and groups of your choice.', br(),
-                               'You can assign one test to one course but the test can be assigned to many groups if applicable.'),
+                               'You can assign one test to one course but the test can be assigned to many groups 
+                               if applicable.'),
                              
                              # Creation form
                              fluidRow(
@@ -525,18 +566,19 @@ if (interactive()) {
                                  )
                                )
                              ),
-                             p("There are 2 options to create your new test. Through an R file attachment or through manual input.",
+                             p("There are 2 options to create your new test. Through an 
+                               R file attachment or through manual input.",
                                tags$ul(
-                                 tags$li(tags$b("Attachment: "), "you can attach an .R file with the questions and answers. 
-                                 Please check the project description file to make sure your attachment has all the required variables."),
-                                 tags$li(tags$b("Manual input: "), "with this option, you will have to provide the questions' 
-                                         description and the correct answer")
+                                 tags$li(tags$b("Attachment: "), "you can attach an .R file with the 
+                                 questions and answers. Please check the project description file to 
+                                         make sure your attachment has all the required variables."),
+                                 tags$li(tags$b("Manual input: "), "with this option, you will have to 
+                                 provide the questions' description and the correct answer")
                                )
                              ),
                              br(),
-                             actionButton(inputId = "AttachBtn", label = "Attachment"),
-                             actionButton(inputId = "ManualBtn", label = "Manual input"),
-                             br(),
+                             selectInput(inputId = 'attachManualBtn', label = 'Please select your preferred option: ',
+                                         choices = c('Attachment', 'Manual input')),
                              hr(),
                              textInput(inputId = "testtopic", label = "Test topic/name", value = ""),
                              fluidRow(
@@ -595,7 +637,8 @@ if (interactive()) {
       
       # Update the checkbox options (sidebar panel) whenever the courses selection changes
       observeEvent(input$courses, {
-        # Reset the selected value of the tests dropdown if the previous selection is not available in the updated choices
+        # Reset the selected value of the tests dropdown if the previous selection is not available in the 
+        #updated choices
         if (!is.null(input$tests) && !(input$tests %in% dbGetQuery(con, paste0("
                       SELECT DISTINCT test_topic 
                       FROM tests WHERE test_id IN (", paste(test_ids(), collapse = ","), ")"))$test_topic)) {
