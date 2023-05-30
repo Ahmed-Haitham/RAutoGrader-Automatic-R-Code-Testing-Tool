@@ -95,10 +95,7 @@ loginServer <- function(input, output, session) {
       shinyjs::html("welcome_msg", paste0("Welcome, ", username, "!"))
       
       # Query the database to fetch the tests
-      tests_query <- "SELECT test_id, test_topic FROM tests where test_id IN (
-                       SELECT DISTINCT q.test_id
-                      FROM questions q
-                      )  and  active = 1 and test_id !=0"
+      tests_query <- "SELECT test_id, test_topic FROM tests where test_id !=0"
       tests <- dbGetQuery(con, tests_query)
       
       # Render the test links dynamically
@@ -117,10 +114,11 @@ loginServer <- function(input, output, session) {
         do.call(tagList, test_links)
       })
       
-     
+      print(input$selected_test)
       
       # Handle test link clicks
       observeEvent(input$selected_test, {
+        print(input$selected_test)
         # Get the test ID from the input value
         test_id <- as.numeric(input$selected_test)
         
@@ -137,7 +135,7 @@ loginServer <- function(input, output, session) {
               question_description <- questions$question_description[i]
               
               tagList(
-                h4(id = paste0("question_", question_id), paste0("Question ", question_id)),
+                h4(paste0("Question ", question_id)),
                 p(question_description),
                 textInput(inputId = paste0("answer_", question_id), label = "Answer")
               )
@@ -154,56 +152,20 @@ loginServer <- function(input, output, session) {
           shinyjs::show("questions_panel")
       })
       
-      
-      # Handle submit button click
-      observeEvent(input$submit_btn, {
-        
-        # Get the selected test ID
-        test_id <- as.numeric(input$selected_test)
-        # Query the database to fetch questions for the selected test
-        questions_query <- paste0("SELECT question_id, question_description FROM questions WHERE test_id = ", test_id)
-        questions <- dbGetQuery(con, questions_query)
-        
-      
-        ##Saving the result
-        for (i in 1:nrow(questions)) {
-          question_id <- questions$question_id[i]
-          answer <- input[[paste0("answer_", question_id)]]
-          query <- paste0("INSERT INTO submissions (test_id, question_id, student_id, answer) VALUES (",
-                          test_id, ", ", question_id, ", '", student_id, "', '", answer, "')")
-          
-          # Execute the SQL query to insert the answer
-          dbExecute(con, query)
-        }
-        
-        
-        # Show a thank you message
-        showModal(modalDialog(
-          title = "Thank You!",
-          paste0("Thanks for submitting your answers, ", username, "!"),
-          easyClose = TRUE
-        ))
-        
-        ## go back to tests
-        #Hide current page 
-        shinyjs::hide("questions_panel") #questions_panel
-        
-        # Show the welcome panel and set the welcome message
-        shinyjs::show("welcome_panel") # welcome_panel
-      })
+     
       
       
-    }
-    # Show an error message or perform other actions for invalid credentials
-    else {
+    } else {
+      # Show an error message or perform other actions for invalid credentials
       showModal(modalDialog(
         title = "Login Failed",
         "Invalid student ID or password. Please try again.",
         easyClose = TRUE
       ))
     }
-    
   })
+  
+  # ...
 }
 
 
