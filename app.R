@@ -3,7 +3,7 @@ Sys.setlocale(category = "LC_CTYPE", locale = "en_US.UTF-8")
 
 # Specify required packages
 required_packages <- c("dplyr", "ggplot2", "tidyr", "renv", "shiny", "shinyjs",
-                       "Rcpp", "RSQLite", "R6", "DBI")
+                       "Rcpp", "RSQLite", "R6", "DBI","xlsx")
 
 # Install missing packages
 missing_packages <- setdiff(required_packages, rownames(installed.packages()))
@@ -274,53 +274,6 @@ questions <- R6Class("questions",
                      )
 )
 
-# ------------------------ TEST R6 CLASSES - all ok -------------------------------------------#
-# tested - ok
-test1 <- users$new("DQN")
-test1$insert()
-dbGetQuery(con, "SELECT * FROM users")
-
-# Create the groups
-# tested - ok 
-test2 <- groups$new("gr 11")
-test2$insert()
-dbGetQuery(con, "SELECT * FROM groups")
-
-# create new course
-# tested - ok
-test3 <- courses$new("Adv. Econometrics")
-test3$insert()
-dbGetQuery(con, "SELECT * FROM courses")
-
-# create tests
-# tested - ok
-test4 <- tests$new("Shiny I", 3)
-test4$insert()
-dbGetQuery(con, "SELECT * FROM tests")
-
-# Create questions
-# tested - ok
-test5 <- questions$new(3,1, "choose the correct answer:", "vector")
-test5$insert()
-dbGetQuery(con, "SELECT * FROM questions")
-
-# create new days
-# tested - ok
-test6 <- days_of_week$new("testing")
-test6$insert()
-dbGetQuery(con, "SELECT * FROM days_of_week")
-
-# create new schedule
-# tested - ok
-test7 <- schedules$new("20:15", "21:45")
-test7$insert()
-dbGetQuery(con, "SELECT * FROM schedules")
-
-# Create the teaching relationship - table
-# tested - ok 
-test6 <- teaching$new(5,3,12,8,8)
-test6$insert()
-dbGetQuery(con, "SELECT * FROM teaching")
 
 #-----------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------
@@ -332,6 +285,10 @@ if (interactive()) {
   library("shiny")
   library("shinyjs")
   library("RSQLite")
+ 
+  install.packages("openxlsx")
+  
+  library("xlsx")
   con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
   
   shinyApp(
@@ -619,7 +576,16 @@ if (interactive()) {
                 ),
                 
                 # Tab 2
-                tabPanel(title = "Tab 2", "This is the content of Tab 2"),
+                tabPanel(title = "Tab 2", "Here you can see how many students took the test",
+                         "You can Export all students results into Excel file",
+                         actionButton(inputId = "export_button", label = "Export to Excel"),
+                         # Add the download handler
+                         downloadButton("download_excel", "Download Excel"),
+                        
+                         # Output table for test results
+                         tableOutput("test_results_table")
+                         
+                         ),
                 # Tab 3
                 tabPanel(title = "Tab 3", "This is the content of Tab 3")
               )
@@ -685,6 +651,59 @@ if (interactive()) {
         # Update the choices for the tests dropdown
         updateSelectInput(session, "tests", choices = test_topics)
       })
+      
+      
+      
+      ############ Tab 2 
+      
+      output$test_results_table <- renderTable({
+        # Run the SQL query to fetch the test results
+        query <- "
+      SELECT  t.test_id,test_topic as 'Test Topic',st.studentCount as 'Submitted Students' FROM tests t ,
+        (select  test_id, count( distinct student_id) as studentCount from submissions group by test_id ) as st
+         where 
+         st.test_id =  t.test_id
+         and 
+         t.test_id IN (
+                       SELECT DISTINCT q.test_id
+                      FROM questions q
+                      )  and  active = 1 and  t.test_id !=0;
+    "
+        results <- dbGetQuery(con, query)
+        
+        
+        
+        
+        # Return the results as a data frame
+        results
+      }  ) 
+      
+      
+      ### Export :
+      
+      # Download handler for exporting data
+      output$download_excel <- downloadHandler(
+        filename = function() {
+          # Set the filename for the exported Excel file
+          paste0("test_results_", Sys.Date(), ".xlsx")
+        },
+        content = function(file) {
+          # Prepare the data to export (replace with your own data)
+          data <- data.frame(
+            test_id = c(1, 2, 3),
+            test_topic = c("Topic 1", "Topic 2", "Topic 3"),
+            submitted_students = c(10, 15, 8)
+          )
+          
+          # Write the data to an Excel file
+          write.xlsx(data, file, row.names = FALSE)
+        }
+      )
+      
+      
+      ###### End Tab2
+      
+      
       
     }
   )
