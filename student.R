@@ -83,9 +83,13 @@ loginServer <- function(input, output, session) {
     
     # If valid credentials, show the welcome page
     if (valid_credentials) {
-      username_query <- paste0("SELECT firstName FROM students WHERE Student_Id = '", student_id, "'")
+      username_query <- paste0("SELECT firstName,group_id FROM students WHERE Student_Id = '", student_id, "'")
       username_result <- dbGetQuery(con, username_query)
-      username <- username_result
+      username <- username_result$firstName
+      group_id <- username_result$group_id
+      
+      ## Select group data
+      
       
       # Hide the login panel
       shinyjs::hide("login_panel")
