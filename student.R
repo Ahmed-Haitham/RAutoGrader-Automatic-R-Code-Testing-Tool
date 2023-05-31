@@ -89,6 +89,13 @@ loginServer <- function(input, output, session) {
       group_id <- username_result$group_id
       
       ## Select group data
+      user_group_query <- paste0("select g.group_name, s.end_time, d.days 
+                                  from groups g, schedules s ,days_of_week d
+                                  where g.schedual_id = s.schedule_id
+                                  and g.days_id = d.id_days
+                                  and g.group_id =  '", group_id, "'")
+      group_result <- dbGetQuery(con, user_group_query)
+      
       
       
       # Hide the login panel
@@ -164,17 +171,80 @@ loginServer <- function(input, output, session) {
         
         # Get the selected test ID
         test_id <- as.numeric(input$selected_test)
+        
+        #get dataset path 
+        dataset_path_query <- paste0("SELECT datasetPath FROM tests WHERE test_id = ", test_id)
+        dataset_path <- dbGetQuery(con, dataset_path_query)
+        
         # Query the database to fetch questions for the selected test
-        questions_query <- paste0("SELECT question_id, question_description FROM questions WHERE test_id = ", test_id)
+        questions_query <- paste0("SELECT question_id, question_description,question_answer,score_points,type FROM questions WHERE test_id = ", test_id)
         questions <- dbGetQuery(con, questions_query)
         
       
         ##Saving the result
         for (i in 1:nrow(questions)) {
           question_id <- questions$question_id[i]
-          answer <- input[[paste0("answer_", question_id)]]
-          query <- paste0("INSERT INTO submissions (test_id, question_id, student_id, answer) VALUES (",
-                          test_id, ", ", question_id, ", '", student_id, "', '", answer, "')")
+          user_answer <- input[[paste0("answer_", question_id)]]
+          # question write answer 
+          correct_answer <-questions$question_answer[i]
+          
+          ## Here we do the evualation later i will move it to function or a package or maybe cpp 
+          
+          if(questions$type[i] == 'TXT') {
+            
+            #question dataset
+            dataset <- read.csv(as.character(dataset_path))
+            
+
+            result <- tryCatch(
+              {
+                eval(parse(text = correct_answer))
+              },
+              error = function(err) {
+                 -1
+              }
+            )
+            #Serilaize correct answer
+            serialized_correct_answer <- serialize(result, NULL)
+            
+            
+            result <- tryCatch(
+              {
+              eval(parse(text = user_answer))
+              },
+              error = function(err) {
+                -1
+              }
+            )
+            #Serilaize user answer
+            serialized_user_answer <- serialize(result, NULL)
+            
+            if( identical(serialized_user_answer, serialized_correct_answer)) {
+              
+              evaluation_score = questions$score_points[i]
+            } else 
+            {
+              evaluation_score = 0;
+            }
+            
+          } else {
+            
+            ## normal TXT answer
+            if( correct_answer == user_answer  ) {
+              
+              evaluation_score = questions$score_points[i]
+            } else 
+            {
+              evaluation_score = 0;
+            }
+            
+          }
+            
+            
+ 
+          ## end of evualtation
+          query <- paste0("INSERT INTO submissions (test_id, question_id, student_id, answer,evaluation) VALUES (",
+                          test_id, ", ", question_id, ", '", student_id, "', '", user_answer, "', ",evaluation_score," )")
           
           # Execute the SQL query to insert the answer
           dbExecute(con, query)
