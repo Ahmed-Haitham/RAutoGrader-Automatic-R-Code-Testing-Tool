@@ -3,7 +3,7 @@ Sys.setlocale(category = "LC_CTYPE", locale = "en_US.UTF-8")
 
 # Specify required packages
 required_packages <- c("dplyr", "ggplot2", "tidyr", "renv", "shiny", "shinyjs",
-                       "Rcpp", "RSQLite", "R6", "DBI")
+                       "Rcpp", "RSQLite", "R6", "DBI", "shinyWidgets")
 
 # Install missing packages
 missing_packages <- setdiff(required_packages, rownames(installed.packages()))
@@ -24,6 +24,8 @@ library(shiny)
 library(shinyjs)
 library(DBI)
 library(RSQLite)
+library(shinyWidgets)
+
 
 
 
@@ -137,7 +139,7 @@ loginServer <- function(input, output, session) {
         
         shinyjs::hide("login_panel")
         # Query the database to fetch questions for the selected test
-        questions_query <- paste0("SELECT question_id, question_description FROM questions WHERE test_id = ", test_id)
+        questions_query <- paste0("SELECT question_id, question_description,type  FROM questions WHERE test_id = ", test_id)
         questions <- dbGetQuery(con, questions_query)
         
        ### prepare the UI:
@@ -146,12 +148,40 @@ loginServer <- function(input, output, session) {
             inputs <- lapply(1:nrow(questions), function(i) {
               question_id <- questions$question_id[i]
               question_description <- questions$question_description[i]
+              question_type <- questions$type[i]
+              
+              if (question_type == "MCQ") {
+                choices_query <- paste0("SELECT Answer_sympol,Answer_description FROM choices WHERE question_id = ", question_id)
+                choices <- dbGetQuery(con, choices_query)
+                
+                
+                
+                # Create a list of radio buttons for MCQ questions
+                mcq_inputs <- lapply(1:nrow(choices), function(j) {
+                  choice_sympol <- as.character(choices$Answer_sympol[j])
+                  choice_description <- choices$Answer_description[j]
+                  
+                  radioButtons(
+                    inputId = paste0("answer_", question_id),
+                    label = choice_description,
+                    choices = choice_sympol,
+                    selected = NULL
+                  )
+                  
+                })
+                
+                tagList(
+                  h4(paste0("Q", question_id, ") ", question_description)),
+                  mcq_inputs
+                )
+              } else {
               
               tagList(
-                h4(id = paste0("question_", question_id), paste0("Question ", question_id)),
-                p(question_description),
+                h4(paste0("Q", question_id, ") ", question_description)),
                 textInput(inputId = paste0("answer_", question_id), label = "Answer")
               )
+              }
+              
             })
             do.call(tagList, inputs)
           })
@@ -187,6 +217,8 @@ loginServer <- function(input, output, session) {
           user_answer <- input[[paste0("answer_", question_id)]]
           # question write answer 
           correct_answer <-questions$question_answer[i]
+          
+          print(user_answer)
           
           ## Here we do the evualation later i will move it to function or a package or maybe cpp 
           
