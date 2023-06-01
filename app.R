@@ -582,8 +582,7 @@ if (interactive()) {
                 ),
                 
                 # Tab 2
-                tabPanel(title = "EXPORT", "Here you can see how many students took the test",
-
+                tabPanel(title = "EXPORT",
                          hr(),
                          "Here you can see how many students took the test, ",
                          "and You can Export all students results into excel file.",
