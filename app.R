@@ -3,7 +3,7 @@ Sys.setlocale(category = "LC_CTYPE", locale = "en_US.UTF-8")
 
 # Specify required packages
 required_packages <- c("dplyr", "ggplot2", "tidyr", "renv", "shiny", "shinyjs",
-                       "Rcpp", "RSQLite", "R6", "DBI","xlsx")
+                       "Rcpp", "RSQLite", "R6", "DBI","openxlsx","tidyverse")
 
 # Install missing packages
 missing_packages <- setdiff(required_packages, rownames(installed.packages()))
@@ -285,10 +285,11 @@ if (interactive()) {
   library("shiny")
   library("shinyjs")
   library("RSQLite")
- 
-  install.packages("openxlsx")
+  library(tidyverse)
   
-  library("xlsx")
+
+  
+
   con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
   
   shinyApp(
@@ -576,9 +577,11 @@ if (interactive()) {
                 ),
                 
                 # Tab 2
-                tabPanel(title = "Tab 2", "Here you can see how many students took the test",
-                         "You can Export all students results into Excel file",
-                         actionButton(inputId = "export_button", label = "Export to Excel"),
+                tabPanel(title = "Tab 2",
+                         hr(),
+                         "Here you can see how many students took the test, ",
+                         "and You can Export all students results into excel file.",
+                         hr(),
                          # Add the download handler
                          downloadButton("download_excel", "Download Excel"),
                         
@@ -688,15 +691,42 @@ if (interactive()) {
           paste0("test_results_", Sys.Date(), ".xlsx")
         },
         content = function(file) {
-          # Prepare the data to export (replace with your own data)
-          data <- data.frame(
-            test_id = c(1, 2, 3),
-            test_topic = c("Topic 1", "Topic 2", "Topic 3"),
-            submitted_students = c(10, 15, 8)
+          
+          ## Select test and it's final grades
+          query <- "Select t.test_id,t.test_topic,sum(q.score_points) finalGrade
+                    from tests t,questions q
+                    where t.test_id = q.test_id
+                    and t.test_id != 0
+                    group by test_topic"
+          results_tests <- dbGetQuery(con, query)
+          
+        
+          
+          
+          query <- "select test_id,student_id,sum(evaluation) score from submissions
+                    group by test_id,student_id"
+          results_students <- dbGetQuery(con, query)
+          
+          
+          merged_df <- merge(results_tests, results_students, by = "test_id", all = TRUE)
+          merged_df <- transform(merged_df, score_ratio = (score / finalGrade) * 100)
+          
+        
+          merged_df <- merged_df %>%
+            select(-test_id, -finalGrade, -score)
+          
+          # Pivot the data frame
+          pivoted_df <- pivot_wider(
+            data = merged_df,
+            names_from = test_topic,
+            values_from = score_ratio,
+            values_fill = 0
           )
           
+        
+          
           # Write the data to an Excel file
-          write.xlsx(data, file, row.names = FALSE)
+          write.xlsx(pivoted_df, file, rowNames= FALSE)
         }
       )
       
