@@ -59,9 +59,13 @@ groups <- R6Class("groups",
                   public = list(
                     group_id = NULL,
                     group_name = NULL,
+                    schedual_id = NULL,
+                    days_id = NULL,
                     
-                    initialize = function(group_name) {
+                    initialize = function(group_name, schedual_id, days_id) {
                       self$group_name <- group_name
+                      self$schedual_id <- schedual_id
+                      self$days_id <- days_id
                       groupid <- dbGetQuery(con, "SELECT group_id FROM groups ORDER BY group_id DESC LIMIT 1")
                       if (nrow(groupid) == 0) {
                         self$group_id <- 1
@@ -73,8 +77,10 @@ groups <- R6Class("groups",
                     },
                     
                     insert = function() {
-                      query <- paste0("INSERT INTO groups (group_id, group_name) VALUES (", 
-                                      self$group_id, ", '", self$group_name, "')")
+                      query <- paste0("INSERT INTO groups 
+                                      (group_id, group_name, schedual_id, days_id) VALUES (", 
+                                      self$group_id, ", '", self$group_name, "', '", 
+                                      self$schedual_id, "', '", days_id, "')")
                       dbExecute(con, query)
                     }
                   )
@@ -241,15 +247,17 @@ questions <- R6Class("questions",
                        question_number = NULL,
                        question_description = NULL,
                        question_answer = NULL,
-                       answers_filepath = "None",
+                       score_points = NULL,
+                       type = NULL,
                        
                        initialize = function(test_id, question_number, question_description,
-                                             question_answer, answers_filepath = "None") {
+                                             question_answer, score_points, type) {
                          self$test_id <- test_id
                          self$question_number <- question_number
                          self$question_description <- question_description
                          self$question_answer <- question_answer
-                         self$answers_filepath <- answers_filepath
+                         self$score_points <- score_points
+                         self$type <- type
                          
                          questid <- dbGetQuery(con, "SELECT question_id FROM questions 
                                                ORDER BY question_id DESC LIMIT 1")
@@ -264,10 +272,10 @@ questions <- R6Class("questions",
                        
                        insert = function() {
                          query <- paste0("INSERT INTO questions (question_id, test_id, question_number, 
-                                       question_description, question_answer, answers_filepath) VALUES (", 
+                                       question_description, question_answer, score_points, type) VALUES (", 
                                          self$question_id, ", ", self$test_id, ", '", self$question_number, "', '",
                                          self$question_description, "', '", self$question_answer, "', '", 
-                                         self$answers_filepath, "')")
+                                         self$score_points, "', '", self$type,"')")
                          
                          dbExecute(con, query)
                        }
@@ -287,9 +295,6 @@ if (interactive()) {
   library("RSQLite")
   library(tidyverse)
   
-
-  
-
   con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
   
   shinyApp(
@@ -318,13 +323,40 @@ if (interactive()) {
       # Hyperlink to register
       p(HTML("<p id='text-register'>Are you new? 
          <a href='#' id='register-link'>Register here</a></p>")),
-      
+      # Username field (hidden by default)
+      shinyjs::hidden(
+        textInput("usernamenew", "Choose your username: ", value = ""),
+        actionButton(inputId = 'createusername', label = 'Submit')
+        
+      ),
       # Tabset with 3 tabs, will show after clicking 'Continue'
       uiOutput("tabset_ui")
     ),
     
     # Define the server
     server <- function(input, output, session) {
+      # Show/hide the Username field based on the register hyperlink click
+      shinyjs::onclick("register-link", {
+        shinyjs::toggle("usernamenew")
+        shinyjs::toggle('createusername')
+      })
+      
+      observeEvent(input$createusername, {
+        # Create a new instance of the 'users' class
+        new_user <- users$new(input$usernamenew)
+        
+        # Insert the new user record into the database
+        new_user$insert()
+        
+        # Show success message
+        showModal(modalDialog(
+          title = "Success",
+          "New user created successfully! Please re-open the application."
+        ))
+        # Close the Shiny app
+        Sys.sleep(3)
+        stopApp()
+      })
       
       # Reactive expression to get the user_id from the selected username
       user_id <- reactive({
@@ -378,6 +410,8 @@ if (interactive()) {
         hide("register-link")
         hide("username")
         hide("continueBtn")
+        hide("usernamenew")
+        hide('createusername')
         output$tabset_ui <- renderUI({
           sidebarLayout(
             sidebarPanel(
@@ -424,20 +458,10 @@ if (interactive()) {
                              selectInput(inputId = 'dayclass', label = 'Teaching day: ', choices = 
                                            dbGetQuery(con, paste0("SELECT * FROM days_of_week"))$days
                              ),
-                             
-                             fluidRow(
-                               column(
-                                 width = 6,
-                                 selectInput(inputId = 'starttime', label = 'Starts at: ', choices = 
-                                               dbGetQuery(con, paste0("SELECT * FROM schedules"))$start_time
-                                 )
-                               ),
-                               column(
-                                 width = 6,
-                                 selectInput(inputId = 'endtime', label = 'Until: ', choices = 
-                                               dbGetQuery(con, paste0("SELECT * FROM schedules"))$end_time)
-                               )
-                             ),
+                             selectInput(inputId = 'schduletime', label = 'Choose the schedule of the course:',
+                                         choices = dbGetQuery(con, paste0("SELECT schedule_id, start_time || ' - ' || end_time 
+                                                                          AS time_range FROM schedules"))$time_range
+                                         ),
                              # Button                                         
                              actionButton(inputId = 'newcourseteach', label = 'Save')
                              
@@ -472,20 +496,10 @@ if (interactive()) {
                                                                       WHERE id_days>0"))$days)
                                  )
                              ),
-                             fluidRow(
-                               column(
-                                 width = 6,
-                                 selectInput(inputId = 'newstartBtn', label = 'Select the start time of the course: ', 
-                                             choices = dbGetQuery(con, paste0("SELECT start_time FROM schedules 
-                                                                      WHERE schedule_id>0"))$start_time)
-                                 ),
-                               column(
-                                 width = 6,
-                                 selectInput(inputId = 'newendBtn', label = 'Select the end time of the course: ', 
-                                             choices = dbGetQuery(con, paste0("SELECT end_time FROM schedules 
-                                                                      WHERE schedule_id>0"))$end_time)
-                               )
-                             ),
+                             selectInput(inputId = 'grouptimes', label = 'Choose the schedule of the group:',
+                                         choices = dbGetQuery(con, paste0("SELECT schedule_id, start_time || ' - ' || end_time 
+                                                                          AS time_range FROM schedules"))$time_range
+                                         ),
                              
                              #button
                              actionButton(inputId = 'newgroupBtn', label = 'Save')
@@ -497,7 +511,7 @@ if (interactive()) {
                              h3(id = "h3newtest", 'Create a new test'),
                              hr(),
                              p(id = "h5ncdescription", 'In this section you will be able to
-                                 add a new test to and assigned it to the course and groups of your choice.', br(),
+                                 add a new test and assigned it to the course and groups of your choice.', br(),
                                'You can assign one test to one course but the test can be assigned to many groups 
                                if applicable.'),
                              
@@ -524,21 +538,15 @@ if (interactive()) {
                                  )
                                )
                              ),
-                             p("There are 2 options to create your new test. Through an 
-                               R file attachment or through manual input.",
-                               tags$ul(
-                                 tags$li(tags$b("Attachment: "), "you can attach an .R file with the 
-                                 questions and answers. Please check the project description file to 
-                                         make sure your attachment has all the required variables."),
-                                 tags$li(tags$b("Manual input: "), "with this option, you will have to 
-                                 provide the questions' description and the correct answer")
-                               )
-                             ),
-                             br(),
-                             selectInput(inputId = 'attachManualBtn', label = 'Please select your preferred option: ',
-                                         choices = c('Attachment', 'Manual input')),
-                             hr(),
                              textInput(inputId = "testtopic", label = "Test topic/name", value = ""),
+                             br(),
+                             p("Please input the questions corresponding to the test."
+                             ),
+                            
+                             hr(),
+                             
+                             selectInput(inputId ='typequestion', label = 'Choose the type of question',
+                                           choices = c('Single choice answer', 'R code answer')),
                              fluidRow(
                                column(
                                  width = 6,
@@ -567,21 +575,20 @@ if (interactive()) {
                              
                              # Buttons
                              actionButton(inputId = "submitBtn", label = "Submit"),
-                             actionButton(inputId = "addQuestionBtn", label = "Add another question"),
+                             actionButton(inputId = "addQuestionBtn", label = "Add another question")
                              
-                             #Attachment
-                             fileInput(inputId = "attachField", label = "Choose the file to attach: ", accept = ".R"),
-                             actionButton(inputId = "attachBtn", label = "Attach")
                            )
                          )
                 ),
                 
                 # Tab 2
-                tabPanel(title = "Tab 2",
+                tabPanel(title = "EXPORT", "Here you can see how many students took the test",
+
                          hr(),
                          "Here you can see how many students took the test, ",
                          "and You can Export all students results into excel file.",
                          hr(),
+
                          # Add the download handler
                          downloadButton("download_excel", "Download Excel"),
                         
@@ -590,18 +597,62 @@ if (interactive()) {
                          
                          ),
                 # Tab 3
-                tabPanel(title = "Tab 3", "This is the content of Tab 3")
+                tabPanel(title = "RESULTS", "This is the content of Tab 3")
               )
             )
           )
         })
       })
       
-      #Buttons
+      # Buttons
       # button CREATE - New course - aka 'Save' id= 'newcourseteach'
       observeEvent(input$newcourseteach, {
-        # create new course using class courses$new(input$newcourse) and then $insert()
+        # Get the selected options
+        course_name <- input$newcourse
+        group_name <- input$grouplist
+        teaching_day <- input$dayclass
+        schedule_time <- input$schduletime
+        
+        # Create a new instance of the 'courses' class
+        new_course <- courses$new(course_name)
+        
+        # Insert the new course record into the database
+        new_course$insert()
+        
+        # Extract the start_time and end_time from the selected schedule_time
+        selected_schedule <- strsplit(schedule_time, " - ")[[1]]
+        start_time <- selected_schedule[1]
+        end_time <- selected_schedule[2]
+        
+        # Get the course_id for the selected course_name
+        course_id <- new_course$course_id
+        
+        # Get the group_id for the selected group_name
+        group_id <- dbGetQuery(con, paste0("SELECT group_id FROM groups WHERE group_name = '", group_name, "'"))$group_id
+        
+        # Get the schedule_id for the selected start_time and end_time
+        schedule_id <- dbGetQuery(con, paste0("SELECT schedule_id FROM schedules WHERE start_time = '", start_time, "' AND end_time = '", end_time, "'"))$schedule_id
+        
+        # Get the id_days for the selected teaching_day
+        id_days <- dbGetQuery(con, paste0("SELECT id_days FROM days_of_week WHERE days = '", teaching_day, "'"))$id_days
+        
+        # Create a new instance of the 'teaching' class
+        new_teaching <- teaching$new(user_id(), course_id, group_id, id_days, schedule_id)
+        
+        # Insert the new teaching record into the database
+        new_teaching$insert()
+        
+       # Show a success message
+        showModal(modalDialog(
+          title = "Success",
+          "New course teaching created successfully! Please restart the app."
+        ))
+        # Close the Shiny app
+        Sys.sleep(4)
+        stopApp()
       })
+      
+      
       
       
       # Update the checkbox options (sidebar panel) whenever the courses selection changes
@@ -726,7 +777,9 @@ if (interactive()) {
         
           
           # Write the data to an Excel file
+
           write.xlsx(pivoted_df, file, rowNames= FALSE)
+
         }
       )
       
