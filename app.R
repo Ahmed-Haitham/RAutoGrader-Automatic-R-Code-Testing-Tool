@@ -596,7 +596,16 @@ if (interactive()) {
                          
                          ),
                 # Tab 3
-                tabPanel(title = "RESULTS", "This is the content of Tab 3")
+                tabPanel(
+                        title = "RESULTS",
+                        hr(),
+                        "Here you can see Analysis for students and the course ",
+                        hr(),
+                        column(width = 6, plotOutput("top5")),
+                        column(width = 6, plotOutput("dev5")),
+                        column(width = 6, plotOutput("groups")),
+                        column(width = 6, plotOutput("questions")) #
+                    )
               )
             )
           )
@@ -782,9 +791,97 @@ if (interactive()) {
         }
       )
       
-      
       ###### End Tab2
+  
+      ##################################################################    
+      ###### Start Tab3
       
+      #########################
+      query_top5 <- "select  student_id, ROUND((sum(evaluation)*1.0/ (select sum(score_points) from questions) * 100 ),2)  as ratio
+                   from submissions
+                  group by student_id
+                  having ratio > 50
+                  order by ratio desc
+                  LIMIT 3"
+      
+      data_top5 <- dbGetQuery(con, query_top5)
+      
+      #########################
+      query_dev5 <- "select  student_id, ROUND((sum(evaluation)*1.0/ (select sum(score_points) from questions) * 100 ),2)  as ratio
+                     from submissions
+                    group by student_id
+                    having ratio < 50
+                    order by ratio asc
+                    LIMIT 5"
+      
+      data_dev5 <- dbGetQuery(con, query_dev5)
+      
+      
+      #########################
+      query_groups <- "select  g.group_name as gr,ROUND((sum(evaluation)*1.0/ (select sum(score_points) from questions) * 100 ),2)  as ratio
+                   from submissions s,students st, groups g
+                   where st.student_id = s.student_id
+                   and g.group_id = st.group_id
+                   group by g.group_name
+                   order by ratio desc"
+      
+      data_groups <- dbGetQuery(con, query_groups)
+      #########################
+      query_questions <- "select CAST(test_id AS TEXT) || ' - ' || CAST(question_id AS TEXT) as 'test-question', count(question_id) as 'No. of Wrong Answers'
+                                  from submissions
+                                  where evaluation = 0
+                                  group by question_id
+                                  order by 2 desc
+                                  "
+      
+      data_questions <- dbGetQuery(con, query_questions)
+      
+      
+      
+      
+      
+      output$top5 <- renderPlot({
+        # Plot the data frame
+        barplot(data_top5$ratio, names.arg = data_top5$student_id,
+                main = "Top 3 Students",
+                xlab = "Student ID", ylab = "Total grade", ylim = c(0, 100), col = "lightblue")
+      
+        # Add value labels on top of the bars
+        text(x = barplot(data_top5$ratio, plot = FALSE), y = data_top5$ratio, labels = data_top5$ratio, pos = 3, cex = 0.8)
+      })
+      
+      output$dev5 <- renderPlot({
+        # Plot the data frame
+        barplot(data_dev5$ratio, names.arg = data_dev5$student_id,
+                main = "Students need development",
+                xlab = "Student ID", ylab = "Total grade", ylim = c(0, 100), col = "purple")
+        
+        # Add value labels on top of the bars
+        text(x = barplot(data_dev5$ratio, plot = FALSE), y = data_dev5$ratio, labels = data_dev5$ratio, pos = 3, cex = 0.8)
+      })
+      
+      
+      output$groups <- renderPlot({
+        # Plot the data frame
+        barplot(data_groups$ratio, names.arg = data_groups$gr,
+                main = "Does time of classes affect grades",
+                xlab = "Group Name", ylab = "Total grade", ylim = c(0, 100), col = "lightgreen")
+        
+        # Add value labels on top of the bars
+        text(x = barplot(data_groups$ratio, plot = FALSE), y = data_groups$ratio, labels = data_groups$ratio, pos = 3, cex = 0.8)
+      })
+      
+      output$questions <- renderPlot({
+        # Plot the data frame
+        barplot(data_questions$'No. of Wrong Answers', names.arg = data_questions$'test-question',
+                main = "What questions was hardest to pass",
+                xlab = 'No. of Wrong Answers', ylab = "test-question", xlim = c(0, 10), col = "orange",las = 2, horiz = TRUE)
+        
+        # Add value labels on top of the bars
+       # text(x = barplot(data_questions$'No. of Wrong Answers', plot = FALSE), y = data_questions$'No. of Wrong Answers', labels = data_questions$'No. of Wrong Answers', pos = 3, cex = 0.8)
+      })
+      
+      ###### End Tab3
       
       
     }
