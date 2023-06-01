@@ -3,7 +3,7 @@ Sys.setlocale(category = "LC_CTYPE", locale = "en_US.UTF-8")
 
 # Specify required packages
 required_packages <- c("dplyr", "ggplot2", "tidyr", "renv", "shiny", "shinyjs",
-                       "Rcpp", "RSQLite", "R6", "DBI")
+                       "Rcpp", "RSQLite", "R6", "DBI","xlsx")
 
 # Install missing packages
 missing_packages <- setdiff(required_packages, rownames(installed.packages()))
@@ -294,9 +294,10 @@ if (interactive()) {
   library("shinyjs")
   library("RSQLite")
  
-  #install.packages("openxlsx")
+  install.packages("openxlsx")
   
-  #library("xlsx")
+  library("xlsx")
+
   con <- dbConnect(RSQLite::SQLite(), "sqliteRAutoGrader.db")
   
   shinyApp(
@@ -584,7 +585,9 @@ if (interactive()) {
                 ),
                 
                 # Tab 2
+
                 tabPanel(title = "EXPORT", "Here you can see how many students took the test",
+
                          "You can Export all students results into Excel file",
                          actionButton(inputId = "export_button", label = "Export to Excel"),
                          # Add the download handler
@@ -748,7 +751,8 @@ if (interactive()) {
           )
           
           # Write the data to an Excel file
-          #write.xlsx(data, file, row.names = FALSE)
+          write.xlsx(data, file, row.names = FALSE)
+
         }
       )
       
