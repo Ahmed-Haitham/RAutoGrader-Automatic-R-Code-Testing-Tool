@@ -612,8 +612,8 @@ if (interactive()) {
         })
       })
       
-      # Buttons
-      # button CREATE - New course - aka 'Save' id= 'newcourseteach'
+      # Buttons - CREATE
+      # button New course - aka 'Save' id= 'newcourseteach'
       observeEvent(input$newcourseteach, {
         # Get the selected options
         course_name <- input$newcourse
@@ -653,13 +653,57 @@ if (interactive()) {
        # Show a success message
         showModal(modalDialog(
           title = "Success",
-          "New course teaching created successfully! Please restart the app."
+          "New course created successfully! Please restart the app."
         ))
         # Close the Shiny app
         Sys.sleep(4)
         stopApp()
       })
       
+      # Button New group
+      observeEvent(input$newgroupBtn, {
+        # Get the selected options
+        course_name1 <- input$slctcourseBtn
+        group_name1 <- input$newgroupsBtn
+        teaching_day1 <- input$newdayBtn
+        schedule_time1 <- input$grouptimes
+        
+        # Get the course_id for the selected course_name
+        course_id1 <- dbGetQuery(con, paste0("SELECT course_id FROM courses WHERE course_name = '", course_name1, "'"))$course_id
+        
+        # Get the group_id for the selected group_name
+        group_id1 <- dbGetQuery(con, paste0("SELECT group_id FROM groups WHERE group_name = '", group_name1, "'"))$group_id
+        
+        # Get the schedule_id for the selected schedule_time
+        selected_schedule1 <- strsplit(schedule_time1, " - ")[[1]]
+        start_time1 <- selected_schedule1[1]
+        end_time1 <- selected_schedule1[2]
+        schedule_id1 <- dbGetQuery(con, paste0("SELECT schedule_id FROM schedules WHERE start_time = '", start_time1, "' AND end_time = '", end_time1, "'"))$schedule_id
+        
+        # Get the id_days for the selected teaching_day
+        id_days1 <- dbGetQuery(con, paste0("SELECT id_days FROM days_of_week WHERE days = '", teaching_day1, "'"))$id_days
+        
+        # Create a new instance of the 'teaching' class
+        new_teaching <- teaching$new(user_id(), course_id1, group_id1, id_days1, schedule_id1)
+        
+        # Insert the new teaching record into the database
+        new_teaching$insert()
+        
+        # Create a new instance of the 'groups' class
+        new_group <- groups$new(group_name1, schedule_id1, id_days1)
+        
+        # Insert the new group record into th e database
+        new_group$insert()
+        
+        # Show a success message
+        showModal(modalDialog(
+          title = "Success",
+          "New group created successfully!"
+        ))
+      })
+      
+      
+      # Button New test
       
       
       
