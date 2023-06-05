@@ -70,7 +70,7 @@ groups <- R6Class("groups",
                       if (nrow(groupid) == 0) {
                         self$group_id <- 1
                       } else {
-                        self$group_id <- groupid + 1
+                        self$group_id <- groupid$group_id + 1
                       }
                       
                       invisible(self)
@@ -80,7 +80,7 @@ groups <- R6Class("groups",
                       query <- paste0("INSERT INTO groups 
                                       (group_id, group_name, schedual_id, days_id) VALUES (", 
                                       self$group_id, ", '", self$group_name, "', '", 
-                                      self$schedual_id, "', '", days_id, "')")
+                                      self$schedual_id, "', '", self$days_id, "')")
                       dbExecute(con, query)
                     }
                   )
@@ -118,11 +118,12 @@ tests <- R6Class("tests",
                    test_id = NULL,
                    test_topic = NULL,
                    teach_id = NULL,
+                   active = 1,
                    
-                   initialize = function(test_topic, teach_id) {
+                   initialize = function(test_topic, teach_id, active = 1) {
                      
-                     testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")
-                     if (nrow(testid) == 0) {
+                     testid <- dbGetQuery(con, "SELECT test_id FROM tests ORDER BY test_id DESC LIMIT 1")$test_id
+                     if (length(testid) == 0) {
                        self$test_id <- 1
                      } else {
                        self$test_id <- testid + 1
@@ -130,17 +131,19 @@ tests <- R6Class("tests",
                      
                      self$test_topic <- test_topic
                      self$teach_id <- teach_id
+                     self$active <- active
                      
                      invisible(self)
                    },
                    
                    insert = function() {
-                     query <- paste0("INSERT INTO tests (test_id, test_topic, teach_id) VALUES (", 
-                                     self$test_id, ", '", self$test_topic, "', '", self$teach_id, "')")
+                     query <- paste0("INSERT INTO tests (test_id, test_topic, teach_id, active) VALUES (", 
+                                     self$test_id, ", '", self$test_topic, "', '", self$teach_id, "', ", self$active, ")")
                      dbExecute(con, query)
                    }
                  )
 )
+
 
 # teaching - ok, SQL connection working
 teaching <- R6Class("teaching",
@@ -158,7 +161,7 @@ teaching <- R6Class("teaching",
                         if (nrow(teach) == 0) {
                           self$teach_id <- 1
                         } else {
-                          self$teach_id <- teach + 1
+                          self$teach_id <- teach$teach_id + 1
                         }
                         
                         self$user_id <- user_id
@@ -194,7 +197,7 @@ courses <- R6Class("courses",
                        if (nrow(courseid) == 0) {
                          self$course_id <- 1
                        } else {
-                         self$course_id <- courseid + 1
+                         self$course_id <- courseid$course_id + 1 #to get vector on lenght 1
                        }
                        
                        
@@ -264,7 +267,7 @@ questions <- R6Class("questions",
                          if (nrow(questid) == 0) {
                            self$question_id <- 1
                          } else {
-                           self$question_id <- questid + 1
+                           self$question_id <- questid$question_id + 1
                          }
                          
                          invisible(self)
@@ -305,7 +308,7 @@ if (interactive()) {
       h1(id = 'h1',style = "text-align: center;", "Welcome to the Automatic R grader management tool!"),
       hr(),
       
-      # Dropdown to select the username
+#ok s# Dropdown to select the username
       selectInput(
         inputId = "username",
         label = "Select your username:",
@@ -351,13 +354,21 @@ if (interactive()) {
         # Show success message
         showModal(modalDialog(
           title = "Success",
-          "New user created successfully! Please re-open the application."
+          "New user created successfully!"
         ))
-        # Close the Shiny app
-        Sys.sleep(3)
-        stopApp()
+        
+        # Clear the information entered
+        updateTextInput(session, "usernamenew", value = "")
+        
+        # Hide the fields again
+        shinyjs::hide("usernamenew")
+        shinyjs::hide("createusername")
+        
+        updateSelectInput(session, 'username', choices = 
+                            c(dbGetQuery(con, "SELECT DISTINCT username FROM users")$username))
       })
-      
+# ok e   
+# ok s
       # Reactive expression to get the user_id from the selected username
       user_id <- reactive({
         if (input$username == "-- Please select your username") {
@@ -382,25 +393,6 @@ if (interactive()) {
           shinyjs::disable("continueBtn")
         }
         print(input$username)
-      })
-      
-      # Get the test IDs for the selected course
-      test_ids <- reactive({
-        req(input$courses)
-        
-        course_id <- dbGetQuery(con, paste0("
-          SELECT DISTINCT course_id FROM courses WHERE course_name = '",
-                                            input$courses, "'"))$course_id
-        
-        teach_ids <- dbGetQuery(con, paste0("
-          SELECT DISTINCT teach_id FROM teaching
-          WHERE user_id = (SELECT user_id FROM users
-                            WHERE username = '", input$username, "'
-          ) AND course_id = '", course_id, "'"))$teach_id
-        
-        dbGetQuery(con, paste0("
-          SELECT DISTINCT test_id FROM tests
-          WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
       })
       
       # When the continue button is clicked, show the tabset
@@ -573,9 +565,9 @@ if (interactive()) {
                                )
                              ),
                              
-                             # Buttons
-                             actionButton(inputId = "submitBtn", label = "Submit"),
-                             actionButton(inputId = "addQuestionBtn", label = "Add another question")
+                             # Button
+                             
+                             actionButton(inputId = "addQuestionBtn", label = "Save/Add next question")
                              
                            )
                          )
@@ -611,9 +603,10 @@ if (interactive()) {
           )
         })
       })
-      
-      # Buttons - CREATE
-      # button New course - aka 'Save' id= 'newcourseteach'
+#ok e
+    
+####### Buttons - CREATE
+#ok # button New course - aka 'Save' id= 'newcourseteach'
       observeEvent(input$newcourseteach, {
         # Get the selected options
         course_name <- input$newcourse
@@ -653,14 +646,20 @@ if (interactive()) {
        # Show a success message
         showModal(modalDialog(
           title = "Success",
-          "New course created successfully! Please restart the app."
+          "New course created successfully!"
         ))
-        # Close the Shiny app
-        Sys.sleep(4)
-        stopApp()
+        # Clear the information entered
+        updateTextInput(session, "newcourse", value = "")
+        updateSelectInput(session, "grouplist", selected = "")
+        updateSelectInput(session, "dayclass", selected = "")
+        updateSelectInput(session, "schduletime", selected = "")
+        
+        updateData()
+        
+        
       })
-      
-      # Button New group
+     
+###### Button New group = ok
       observeEvent(input$newgroupBtn, {
         # Get the selected options
         course_name1 <- input$slctcourseBtn
@@ -669,19 +668,23 @@ if (interactive()) {
         schedule_time1 <- input$grouptimes
         
         # Get the course_id for the selected course_name
-        course_id1 <- dbGetQuery(con, paste0("SELECT course_id FROM courses WHERE course_name = '", course_name1, "'"))$course_id
+        course_id1 <- dbGetQuery(con, paste0("SELECT course_id FROM courses WHERE course_name = '", 
+                                             course_name1, "'"))$course_id
         
         # Get the group_id for the selected group_name
-        group_id1 <- dbGetQuery(con, paste0("SELECT group_id FROM groups WHERE group_name = '", group_name1, "'"))$group_id
+        group_id1 <- dbGetQuery(con, paste0("SELECT group_id FROM groups WHERE group_name = '", 
+                                            group_name1, "'"))$group_id
         
         # Get the schedule_id for the selected schedule_time
         selected_schedule1 <- strsplit(schedule_time1, " - ")[[1]]
         start_time1 <- selected_schedule1[1]
         end_time1 <- selected_schedule1[2]
-        schedule_id1 <- dbGetQuery(con, paste0("SELECT schedule_id FROM schedules WHERE start_time = '", start_time1, "' AND end_time = '", end_time1, "'"))$schedule_id
+        schedule_id1 <- dbGetQuery(con, paste0("SELECT schedule_id FROM schedules WHERE start_time = '", 
+                                               start_time1, "' AND end_time = '", end_time1, "'"))$schedule_id
         
         # Get the id_days for the selected teaching_day
-        id_days1 <- dbGetQuery(con, paste0("SELECT id_days FROM days_of_week WHERE days = '", teaching_day1, "'"))$id_days
+        id_days1 <- dbGetQuery(con, paste0("SELECT id_days FROM days_of_week WHERE days = '", 
+                                           teaching_day1, "'"))$id_days
         
         # Create a new instance of the 'teaching' class
         new_teaching <- teaching$new(user_id(), course_id1, group_id1, id_days1, schedule_id1)
@@ -698,22 +701,143 @@ if (interactive()) {
         # Show a success message
         showModal(modalDialog(
           title = "Success",
-          "New group created successfully!"
+          "New group created successfully! Please restart the app."
         ))
+        
+        #clear inputs
+        updateSelectInput(session, "slctcourseBtn", selected = "")
+        updateSelectInput(session, "newgroupsBtn", selected = "")
+        updateSelectInput(session, "newdayBtn", selected = "")
+        updateSelectInput(session, "grouptimes", selected = "")
+        
       })
       
       
       # Button New test
+###### Button Save/submit another question
+      observeEvent(input$addQuestionBtn, {
+        # Find course_id based on input$courses2
+        courseid <- dbGetQuery(con, paste0("SELECT course_id FROM courses WHERE course_name = '", 
+                                            input$courses2, "'"))$course_id
+        
+        # Loop for groups (when user selects more than 1 group to add the test)
+        for (group_str in input$groups2) {
+          #user_id
+          userid <- dbGetQuery(con, paste0("SELECT user_id FROM users WHERE username = '", input$username, "'"))$user_id
+          print(userid)
+          # Find teaching_id based on input$courses2, user_id in current session, input$groups2
+          teachid <- dbGetQuery(con, paste0("SELECT teach_id FROM group_info_view WHERE user_id = '", userid, "'
+                                  AND course_name = '", input$courses2, "'
+                                  AND group_info = '", group_str, "'"))$teach_id
+          
+          print(teachid)
+          testtopic1 <- input$testtopic
+          print(testtopic1)
+          
+          # Check if the test already exists
+          existing_test <- dbGetQuery(con, paste0("SELECT test_id FROM tests WHERE test_topic = '", testtopic1, "'
+                                            AND teach_id = '", teachid, "'"))
+          if (nrow(existing_test) == 0) {
+            # Create a new instance of the 'tests' class
+            new_test <- tests$new(testtopic1, teachid)
+            
+            # Insert the new test record into the database
+            new_test$insert()
+            
+            # Save the test_id of the newly created test row
+            id_currtest <- new_test$test_id
+            
+            #dbExecute(con, paste0("UPDATE tests SET active = 1 WHERE test_id = '", id_currtest, "'"))
+          } else {
+            # Test already exists, use the existing test_id
+            id_currtest <- existing_test$test_id[1]
+          }
+          
+          
+          # Determine the type based on input$typequestion
+          if (input$typequestion == "Single choice answer") {
+            type <- "MCQ"
+          } else {
+            type <- "TXT"
+          }
+          
+          # Create a new instance of the 'questions' class
+          new_question <- questions$new(id_currtest, input$questnumber, input$question, input$questanswer, input$questpoints, type)
+          
+          # Insert the new question record into the database
+          new_question$insert()
+          
+          # If typequestion is 'Single choice answer', insert question_id into choices table
+          if (input$typequestion == "Single choice answer") {
+            # Insert question_id into choices table
+            dbExecute(con, paste0("INSERT INTO choices (question_id, answer_description) 
+                                  VALUES ('", new_question$question_id, "', '", new_question$question_answer, "')"))
+          }
+        }
+        
+        # Clear the information entered
+        updateSelectInput(session, "typequestion", selected = "")
+        updateNumericInput(session, "questnumber", value = 1)
+        updateNumericInput(session, "questpoints", value = 0)
+        updateTextInput(session, "questanswer", value = "")
+        updateTextInput(session, "question", value = "")
+      })
       
       
+########## end buttons ######
+      
+################################## side bar panel 
+# ok start #      
+      updateData <- function() {
+        # Get the latest data from the database
+        
+        # Update the choices of the courses selectInput, sidebar panel
+        course_choices <- dbGetQuery(con, "SELECT DISTINCT course_name FROM courses")
+        updateSelectInput(session, "courses", choices = dbGetQuery(con, paste0("
+                      SELECT DISTINCT course_name FROM courses 
+                      JOIN teaching ON teaching.course_id = courses.course_id
+                      JOIN users ON users.user_id = teaching.user_id
+                      WHERE users.username = '", input$username, "'"
+        ))$course_name)
+        
+        # Update courses choices on CREATE - new group
+        updateSelectInput(session,'slctcourseBtn',
+                    choices = dbGetQuery(con, paste0("
+                                   SELECT DISTINCT course_name FROM courses JOIN teaching 
+                                   ON teaching.course_id = courses.course_id JOIN users 
+                                   ON users.user_id = teaching.user_id WHERE users.username = '", 
+                                                     input$username, "'"))$course_name)
+        
+        
+                          
+      }
+      
+      
+      # Define a function to retrieve test IDs based on the selected course and groups
+      getTestIDs <- function(course, groups) {
+        # Get the course ID
+        course_id <- dbGetQuery(con, paste0("
+    SELECT DISTINCT course_id FROM courses WHERE course_name = '",
+                                            course, "'"))$course_id
+        
+        # Get the teach IDs for the selected groups
+        teach_ids <- dbGetQuery(con, paste0("SELECT teach_id FROM group_info_view WHERE group_info IN ('", 
+                                            paste(groups, collapse = "','"), "')"))$teach_id
+        
+        # Get the test IDs associated with the teach IDs
+        test_ids <- dbGetQuery(con, paste0("SELECT DISTINCT test_id FROM tests
+                                      WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
+        
+        return(test_ids)
+      }
       
       # Update the checkbox options (sidebar panel) whenever the courses selection changes
       observeEvent(input$courses, {
         # Reset the selected value of the tests dropdown if the previous selection is not available in the 
-        #updated choices
+        # updated choices
         if (!is.null(input$tests) && !(input$tests %in% dbGetQuery(con, paste0("
-                      SELECT DISTINCT test_topic 
-                      FROM tests WHERE test_id IN (", paste(test_ids(), collapse = ","), ")"))$test_topic)) {
+                SELECT DISTINCT test_topic 
+                FROM tests WHERE test_id IN (", paste(getTestIDs(input$courses, input$groups), collapse = ","), ")"))$test_topic)) {
           updateSelectInput(session, "tests", selected = NULL)
         }
         
@@ -728,6 +852,57 @@ if (interactive()) {
         updateCheckboxGroupInput(session, "groups", choices = group_names)
       })
       
+      
+      # Get the test IDs for the selected course
+      test_ids <- reactive({
+        req(input$courses)
+        
+        course_id <- dbGetQuery(con, paste0("
+          SELECT DISTINCT course_id FROM courses WHERE course_name = '",
+                                            input$courses, "'"))$course_id
+        
+        teach_ids <- dbGetQuery(con, paste0("
+          SELECT DISTINCT teach_id FROM group_info_view
+          WHERE user_id = '", user_id, "'
+          AND course_name = '", input$courses, "' 
+          AND group_info = '", input$groups, "'"))$teach_id
+        
+        dbGetQuery(con, paste0("
+          SELECT DISTINCT test_id FROM tests
+          WHERE teach_id IN (", paste(teach_ids, collapse = ","), ")"))$test_id
+      })
+      
+      # Update the tests dropdown whenever the groups selection changes
+      observeEvent(input$groups, {
+        # Get the selected groups
+        selected_groups <- input$groups
+        
+        # Check if multiple groups are selected
+        if (length(selected_groups) > 1) {
+          # Get the teach_ids for the selected groups
+          teach_ids <- dbGetQuery(con, paste0("SELECT teach_id FROM group_info_view WHERE group_info IN ('", 
+                                              paste(selected_groups, collapse = "','"), "')"))$teach_id
+          
+          # Get the test topics that are common to all the selected teach_ids
+          common_test_topics <- dbGetQuery(con, paste0("SELECT test_topic FROM tests WHERE teach_id IN (",
+                                                       paste(teach_ids, collapse = ","), ") GROUP BY test_topic HAVING COUNT(DISTINCT teach_id) = ",
+                                                       length(selected_groups)))$test_topic
+          
+          # Update the tests dropdown with the common test topics
+          updateSelectInput(session, "tests", choices = common_test_topics)
+        } else {
+          # If only one group is selected, show all the test topics associated with that group
+          teach_id <- dbGetQuery(con, paste0("SELECT teach_id FROM group_info_view WHERE group_info = '", selected_groups, "'"))$teach_id
+          
+          test_topics <- dbGetQuery(con, paste0("SELECT test_topic FROM tests WHERE teach_id = ", teach_id))$test_topic
+          
+          # Update the tests dropdown with the test topics
+          updateSelectInput(session, "tests", choices = test_topics)
+        }
+      })
+      
+# ok end #    
+      
       # Update the drop-down options for groups (CREATE tab) whenever the courses selection changes
       observeEvent(input$courses2, {
         # Get the user_id for the selected username
@@ -740,24 +915,6 @@ if (interactive()) {
         updateCheckboxGroupInput(session, "groups2", choices = group_names2)
       })
       #
-      
-      
-      # Update the test choices whenever the courses or groups selection changes
-      observeEvent({input$courses; input$groups}, {
-        # Get the user_id for the selected username
-        user_id_val <- user_id()
-        
-        # Get the test topics for the selected course and groups
-        test_topics <- dbGetQuery(con, paste0("SELECT tests.test_topic FROM tests 
-        JOIN teaching ON tests.teach_id = teaching.teach_id JOIN group_info_view 
-        ON teaching.teach_id = group_info_view.teach_id WHERE teaching.user_id = '", user_id_val, "'
-      AND group_info_view.course_name = '", input$courses, "' 
-      AND group_info_view.group_info = '", input$groups, "'"))$test_topic
-        
-        # Update the choices for the tests dropdown
-        updateSelectInput(session, "tests", choices = test_topics)
-      })
-      
       
       
       ############ Tab 2 
@@ -802,8 +959,6 @@ if (interactive()) {
                     and t.test_id != 0
                     group by test_topic"
           results_tests <- dbGetQuery(con, query)
-          
-        
           
           
           query <- "select test_id,student_id,sum(evaluation) score from submissions
