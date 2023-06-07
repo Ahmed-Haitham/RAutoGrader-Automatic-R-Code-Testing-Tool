@@ -25,6 +25,10 @@ library(shinyjs)
 library(DBI)
 library(RSQLite)
 library(shinyWidgets)
+library(myPackage)
+library(Rcpp)
+Sys.setenv("PKG_LIBS" = "-lsqlite3")
+sourceCpp("mycppCode.cpp")
 
 
 
@@ -85,10 +89,9 @@ loginServer <- function(input, output, session) {
     
     # If valid credentials, show the welcome page
     if (valid_credentials) {
-      username_query <- paste0("SELECT firstName FROM students WHERE Student_Id = '", student_id, "'")
-      username_result <- dbGetQuery(con, username_query)
-      username <- username_result
-   
+      #CPP code
+      username <- getUserName(student_id)
+     
       
      
       
@@ -100,11 +103,8 @@ loginServer <- function(input, output, session) {
       shinyjs::html("welcome_msg", paste0("Welcome, ", username, "!"))
       
       # Query the database to fetch the tests
-      tests_query <- "SELECT test_id, test_topic FROM tests where test_id IN (
-                       SELECT DISTINCT q.test_id
-                      FROM questions q
-                      )  and  active = 1 and test_id !=0"
-      tests <- dbGetQuery(con, tests_query)
+
+      tests  <- fetch_tests(con)
       
       # Render the test links dynamically
       output$test_links <- renderUI({

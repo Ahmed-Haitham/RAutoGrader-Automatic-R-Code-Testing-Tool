@@ -1,0 +1,13 @@
+Package: myPackage
+Title: Connect to SQLite and Fetch Data
+Version: 1.0.0
+Authors:
+    Hamed Ahmed <h.hamedahmed@student.uw.edu.pl>
+    Ahmed Abdelmaksoud <a.abdelmakso@student.uw.edu.pl>
+    Daniela Quintero Narvaez <d.quinterona@student.uw.edu.pl>
+Description: This package provides functions to establish a connection to a SQLite database and fetch data from it. It offers an easy and efficient way to query SQLite databases, enabling users to retrieve data for analysis or other purposes.
+License: MIT
+Encoding: UTF-8
+Imports:
+    RSQLite
+RoxygenNote: 7.2.3
